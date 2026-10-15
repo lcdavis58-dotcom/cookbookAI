@@ -1,0 +1,18 @@
+# Contains the Pi's SSH password, never commit
+.vscode/sftp.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Data that lives outside app/ on the Pi, ignored here in case a copy
+# ever ends up in this folder
+chroma_db/
+*.pdf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,19 @@
+{
+  "_comment": "Words/phrases that unambiguously mean 'scale by this exact factor', regardless of which cookbook the recipe is from. Detected before the model is ever involved, since these are unambiguous and don't need judgment. Add new entries as you notice phrasing this misses.",
+  "words": {
+    "double": 2.0,
+    "doubled": 2.0,
+    "doubling": 2.0,
+    "triple": 3.0,
+    "tripled": 3.0,
+    "tripling": 3.0,
+    "quadruple": 4.0,
+    "quadrupled": 4.0,
+    "half": 0.5,
+    "halve": 0.5,
+    "halved": 0.5,
+    "halving": 0.5,
+    "quarter": 0.25,
+    "quartered": 0.25
+  }
+}

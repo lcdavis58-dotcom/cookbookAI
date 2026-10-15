@@ -1,0 +1,23 @@
+{
+  "_comment": "Cue phrases used to tell which of two pan sizes mentioned in a question is the recipe's original vs. the user's target, regardless of which order they're mentioned in ('the recipe calls for X, I have Y' vs 'I have Y, but the recipe wants X'). Falls back to assuming first-mentioned-is-original when neither cue is found nearby. Add phrasing you notice this doesn't catch.",
+  "original_cues": [
+    "recipe calls for",
+    "recipe wants",
+    "recipe uses",
+    "recipe requires",
+    "recipe needs",
+    "normally uses",
+    "calls for",
+    "the recipe"
+  ],
+  "target_cues": [
+    "i only have",
+    "i've got",
+    "i have",
+    "i got",
+    "mine is",
+    "only have",
+    "but i have",
+    "but mine"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "_comment": "Ingredients matched here are discrete/countable items where a fractional scaled amount isn't practical to use. 'keyword' is matched as a case-insensitive substring against each parsed ingredient name, so 'egg' also catches 'large eggs', 'egg whites', 'egg yolks', etc. Add entries as you run into more of these.",
+  "ingredients": [
+    {
+      "keyword": "egg",
+      "note": "Eggs don't divide cleanly. If the scaled amount isn't a whole number, round to the nearest whole egg, or whisk one egg and measure out a partial amount by volume (about 3 tablespoons per large egg) if precision matters."
+    },
+    {
+      "keyword": "graham cracker",
+      "note": "Whole crackers/sheets don't split cleanly. Round to the nearest whole cracker, extra crumbs from a slightly-over amount are rarely a problem."
+    },
+    {
+      "keyword": "pie crust",
+      "note": "A pie crust isn't a divisible quantity. Scaling likely means you need a different pan size or an extra crust, not a fractional one."
+    },
+    {
+      "keyword": "sheet of gelatin",
+      "note": "Gelatin sheets are discrete units. Round to the nearest whole sheet, sheet gelatin has some flex in practice."
+    }
+  ]
+}

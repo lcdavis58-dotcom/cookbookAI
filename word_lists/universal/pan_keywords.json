@@ -1,0 +1,4 @@
+{
+  "_comment": "Keywords that suggest a question is about pan/dish size, regardless of cookbook. This is a cheap gate deciding whether to attempt pan-size extraction at all, not the extraction logic itself (that's in pan_scaling.py). Add container types as you notice ones this misses (e.g. 'sheet', 'tray').",
+  "keywords": ["pan", "dish", "tin"]
+}

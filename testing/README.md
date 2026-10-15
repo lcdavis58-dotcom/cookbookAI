@@ -1,0 +1,20 @@
+# testing/
+
+Run everything from `app/`.
+
+## one_off/
+Diagnostic scripts used while debugging. They print output for a person to read and don't pass or fail.
+
+| Script | What it shows |
+|---|---|
+| `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF (needs the PDF, so run it on the Pi) |
+| `title_boundary_test.py` | Dessert Person title detection against 8 real title blocks |
+| `book_on_pie_line_check.py` | Book on Pie ingredient-line parsing for a set of real lines |
+
+Each one runs as `python3 testing/one_off/<script>.py` or `python3 -m testing.one_off.<script>`.
+
+## Real tests (to come)
+Put automated tests in `testing/unit/test_*.py` and run them with `python3 -m pytest testing`. Good first candidates, which can mostly be built from the one-off scripts above:
+- `books/*`: `find_recipe_starts`, `extract_title` and `parse_ingredient_line` on real text
+- `scale_utils/ingredients.py`: grouping and line-wrap joining
+- `scale_utils/measurement_display.py`, `pan_scaling.py`, `recipe_scaling.resolve_scale_factor`: pure functions, no model or database needed

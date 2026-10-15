@@ -1,0 +1,25 @@
+{
+  "_comment": "Ingredients matched here scale fine arithmetically, but a fractional result implies an awkward, perishable, or hard-to-store leftover (half a can, part of a bottle, etc). 'keyword' is matched as a case-insensitive substring against each parsed ingredient name. These produce a note, not a blocker, unlike non_scalable.json.",
+  "ingredients": [
+    {
+      "keyword": "coconut milk",
+      "note": "Canned coconut milk doesn't keep well once opened. A fractional amount means leftover you'll need to use within a few days or freeze."
+    },
+    {
+      "keyword": "sweetened condensed milk",
+      "note": "This usually comes in one can size. A fractional amount leaves an open can with a short fridge life."
+    },
+    {
+      "keyword": "buttermilk",
+      "note": "Buttermilk is usually sold in larger containers than most recipes use. A fractional amount means more leftover to use up before it spoils."
+    },
+    {
+      "keyword": "heavy cream",
+      "note": "Heavy cream has a limited fridge life once opened. A small fractional amount may be more than you'll use before it turns."
+    },
+    {
+      "keyword": "cream cheese",
+      "note": "Cream cheese is usually sold in fixed block sizes. A fractional amount leaves a partial block to store and use up."
+    }
+  ]
+}
