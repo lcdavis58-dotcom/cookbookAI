@@ -21,13 +21,13 @@ a comma, size/state/unit words like "large", "melted" or "ounces",
 plurals). Varieties stay distinct, salted butter is not unsalted butter,
 light brown sugar is not dark brown sugar. Names that might be the same
 thing are listed for a person to decide, never merged automatically. The
-rules themselves live in word_lists/universal/ingredient_normalization.json.
+rules live in match_utils/ingredient_names.py and
+word_lists/universal/ingredient_normalization.json.
 """
 
 import argparse
 import csv
 import os
-import re
 import sys
 from collections import Counter, defaultdict
 
@@ -36,117 +36,10 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from books import strategy_for  # noqa: E402
-from common.word_list_loader import load_universal  # noqa: E402
+from match_utils.ingredient_names import normalize  # noqa: E402
+from match_utils.recipe_index import load_recipes  # noqa: E402
 from query_utils.recipe_matching import display_title, extract_title  # noqa: E402
 from scale_utils.ingredients import extract_ingredient_groups  # noqa: E402
-
-RULES = load_universal("ingredient_normalization.json", {})
-LEADING_WORDS = set(RULES.get("leading_words", []))
-LEADING_PHRASES = [re.compile(p) for p in RULES.get("leading_phrases", [])]
-EQUIVALENTS = RULES.get("equivalents", {})
-IGNORE = set(RULES.get("ignore", []))
-PLURAL_EXCEPTIONS = RULES.get("plural_exceptions", {})
-
-# A trailing "for the pan" / "for serving" with no comma before it, e.g.
-# "Neutral oil for the pan". Marks the ingredient as not part of the
-# recipe proper.
-_FOR_USE_RE = re.compile(
-    r"\s+for\s+(?:the\s+\w+|serving|sprinkling|dusting|brushing|greasing|garnish|topping)\b.*$")
-_PAREN_RE = re.compile(r"\([^()]*\)?")
-# A pointer to another recipe in the book: "1 recipe Brioche Dough",
-# "Flaky All-Butter Pie Dough (this page)", "One 9-inch pie crust (see
-# Recommended Crusts)", "Pie dough for a double crust (see below)",
-# "Full Batch of Classic Whipped Cream".
-_SUB_RECIPE_RE = re.compile(r"\bbatch\b|\bpage\s+\d+|\brecipes?\b|\bthis page\b"
-                            r"|\bsee below\b|\brecipe follows\b|\bcrusts?\b")
-_OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|garnish|topping)\b"
-                          r"|\bfor the (?:pan|pans|baking sheet|work surface)\b")
-
-
-def singular(word):
-    if word in PLURAL_EXCEPTIONS:
-        return PLURAL_EXCEPTIONS[word]
-    if len(word) > 4 and word.endswith("ies"):
-        return word[:-3] + "y"          # cherries, anchovies
-    if word.endswith("oes"):
-        return word[:-2]                # tomatoes, potatoes
-    if word.endswith(("ches", "shes", "sses", "xes")):
-        return word[:-2]                # peaches, radishes
-    if word.endswith("s") and not word.endswith(("ss", "us", "is")):
-        return word[:-1]                # eggs, pecans, yolks
-    return word
-
-
-def normalize(name):
-    """Parsed ingredient name -> (normalized name, flags). Flags are any of
-    "optional" (garnish, pan grease, explicitly optional), "sub_recipe"
-    (a reference to another recipe, not a purchasable ingredient),
-    "alternative" (an "X or Y" choice) and "ignored" (on the ignore
-    list)."""
-    flags = set()
-    text = name.lower().strip()
-    # "butter, at room temperature, plus more for the pan" still needs the
-    # butter, only the "plus more" part is pan prep, so look for optional
-    # wording before any "plus" clause.
-    if _OPTIONAL_RE.search(re.split(r",?\s+plus\b", text, maxsplit=1)[0]):
-        flags.add("optional")
-    if _SUB_RECIPE_RE.search(text):
-        flags.add("sub_recipe")
-
-    text = _PAREN_RE.sub(" ", text)
-    text = text.split(",", 1)[0]
-    text = _FOR_USE_RE.sub("", text)
-    text = re.sub(r"\s+", " ", text).strip(" .;:-")
-
-    # Phrases and words alternate until neither removes anything, since a
-    # phrase can sit behind a unit word ("ounces fresh or frozen ...").
-    # Every change shortens the name, so this always ends.
-    words = text.split()
-    while True:
-        before = words
-        joined = " ".join(words)
-        for phrase in LEADING_PHRASES:
-            stripped = phrase.sub("", joined).strip()
-            if stripped:
-                joined = stripped
-        words = joined.split()
-        if len(words) > 1 and words[0] in LEADING_WORDS:
-            words = words[1:]
-        if words == before:
-            break
-    if words:
-        words[-1] = singular(words[-1])
-    text = " ".join(words)
-    text = EQUIVALENTS.get(text, text)
-
-    if re.search(r"\bor\b", text):
-        flags.add("alternative")
-    if text in IGNORE:
-        flags.add("ignored")
-    return text, flags
-
-
-def load_recipes():
-    """Every recipe in the database as {key: {"book", "text"}}, with split
-    recipes stitched back together by recipe_id (same as
-    query_utils.retrieval.full_recipe_text, but for all of them at once)."""
-    from query_utils.retrieval import get_collection  # needs chromadb, so imported late
-
-    result = get_collection().get(where={"content_type": "recipe"},
-                                  include=["documents", "metadatas"])
-    parts = defaultdict(list)
-    books = {}
-    chunk_ids = defaultdict(list)
-    for chunk_id, doc, meta in zip(result["ids"], result["documents"], result["metadatas"]):
-        # Chunks ingested before recipe_id existed are each their own recipe.
-        key = meta.get("recipe_id") or chunk_id
-        parts[key].append((meta.get("part", 0), doc))
-        books[key] = meta["book"]
-        chunk_ids[key].append(chunk_id)
-    return {key: {"book": books[key],
-                  "text": "\n".join(doc for _, doc in sorted(chunks, key=lambda c: c[0])),
-                  "chunk_ids": chunk_ids[key]}
-            for key, chunks in parts.items()}
 
 
 def analyze(recipes):

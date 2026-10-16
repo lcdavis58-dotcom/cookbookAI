@@ -16,7 +16,7 @@
     "quart", "quarts", "pint", "pints",
     "envelope", "envelopes", "package", "packages", "tube", "tubes",
     "bunch", "bunches", "head", "heads", "sprig", "sprigs", "stalk", "stalks",
-    "clove", "cloves"
+    "clove", "cloves", "sheet", "sheets", "can", "cans", "jar", "jars", "bag", "bags"
   ],
 
   "_leading_phrases": "Regular expressions removed from the front of a name before leading_words. Mostly leftovers from lines a parser only half understood: ranges ('7 to 14 g / 1 to 2 tablespoons cornstarch' leaves 'to 14 g / ...'), a second measure, 'plus a pinch of'.",
@@ -26,7 +26,11 @@
     "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
     "^or\\s+\\d+\\s+",
     "^(?:one|two|three|\\d+)\\s+[\\d.]+-ounce\\s+(?:can|package|jar|bag)\\s+",
+    "^plus\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
+    "^to\\s+\\d+\\s+",
+    "^[\\d.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
     "^fresh\\s+or\\s+frozen\\s+",
+    "^[\\d½¼¾]+-inch\\s*(?:/\\s*[\\d.]+-cm\\s*)?(?:pieces?\\s+)?",
     "^firm\\s+ripe\\s+"
   ],
 

@@ -11,6 +11,9 @@ Where things live:
     ingest_utils/pdf_text.py   PDF -> ordered text and line stream
     ingest_utils/chunking.py   line stream -> chunks (shared by all books)
     books/<book>.py     each book's own recipe-boundary detection
+    match_utils/recipe_index.py  the recipe index, rebuilt at the end of
+                               every run (tools/build_recipe_index.py
+                               rebuilds it alone, without re-ingesting)
 
 Requires:
     pip install pymupdf chromadb ollama
@@ -26,6 +29,7 @@ from common.config import CHROMA_PATH, COLLECTION_NAME
 from common.embeddings import embed_document
 from ingest_utils.chunking import chunk_recipe_aware, chunk_text
 from ingest_utils.pdf_text import build_line_stream, extract_pages
+from match_utils.recipe_index import build_index, save_index, summarize
 
 COOKBOOKS_DIR = "/home/pi/CookbookAI/cookbooks"
 
@@ -141,3 +145,10 @@ if __name__ == "__main__":
             print(f"Skipping, PDF not found at {pdf_path}")
             continue
         ingest_pdf(pdf_path, book_title)
+
+    # Rebuilt from the whole database, not just the books ingested this
+    # run, so ingesting one book at a time still leaves a complete index.
+    print("\n=== Recipe index ===")
+    entries = build_index()
+    save_index(entries)
+    print("\n".join(summarize(entries)))

@@ -46,6 +46,7 @@ PDF paths are set in `BOOKS` in `ingest.py`. Then:
 ```
 python3 ingest.py               # build the database
 python3 tools/clear_chroma.py   # wipe it before a full re-ingest
+python3 tools/build_recipe_index.py   # rebuild only the recipe index, no re-ingest
 ```
 
 Run every script from `app/`.
@@ -61,6 +62,7 @@ Run every script from `app/`.
 | `ingest.py`, `ingest_utils/` | PDF → text → recipe-aware chunks → Chroma |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title matching |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
+| `match_utils/` | Ingredient name normalization and the recipe index (built at ingest) |
 | `books/` | Per-book format rules (recipe boundaries, titles, ingredient lines) |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |

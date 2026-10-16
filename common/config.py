@@ -13,5 +13,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Assumes the layout CookbookAI/app/ and CookbookAI/chroma_db/
 CHROMA_PATH = os.path.join(PROJECT_ROOT, "..", "chroma_db")
+# Built from the database at the end of every ingest (and by
+# tools/build_recipe_index.py), see match_utils/recipe_index.py.
+RECIPE_INDEX_PATH = os.path.join(PROJECT_ROOT, "..", "recipe_index.json")
 COLLECTION_NAME = "cookbooks"
 EMBED_MODEL = "nomic-embed-text"

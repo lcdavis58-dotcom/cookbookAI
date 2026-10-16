@@ -45,7 +45,7 @@ from books import profile_for, strategy_for  # noqa: E402
 from common.text_parsing import ALLCAPS_LINE_RE, is_component_label  # noqa: E402
 from query_utils.recipe_matching import display_title, extract_title  # noqa: E402
 from scale_utils.ingredients import extract_ingredient_groups  # noqa: E402
-from testing.one_off.ingredient_frequency import load_recipes  # noqa: E402
+from match_utils.recipe_index import load_recipes  # noqa: E402
 
 # Short tags so the decision lines up in a column ahead of the text.
 TAGS = {

@@ -19,17 +19,22 @@ import sys
 # import path so the shared config below can be found.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from common.config import CHROMA_PATH  # noqa: E402  (needs the path above)
+from common.config import CHROMA_PATH, RECIPE_INDEX_PATH  # noqa: E402  (needs the path above)
 
 
 if __name__ == "__main__":
     path = os.path.abspath(CHROMA_PATH)
+    index_path = os.path.abspath(RECIPE_INDEX_PATH)
     if not os.path.exists(path):
         print(f"Nothing to clear, {path} doesn't exist.")
     else:
-        answer = input(f"Delete {path} and everything in it? [y/N] ")
+        # The recipe index is built from the database, so it goes too.
+        also = f" and {index_path}" if os.path.exists(index_path) else ""
+        answer = input(f"Delete {path} and everything in it{also}? [y/N] ")
         if answer.strip().lower() == "y":
             shutil.rmtree(path)
+            if also:
+                os.remove(index_path)
             print("Cleared.")
         else:
             print("Cancelled, nothing deleted.")
