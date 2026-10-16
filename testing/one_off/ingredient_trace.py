@@ -15,6 +15,7 @@ Run from app/ (either form works):
     python3 testing/one_off/ingredient_trace.py "black forest" "eton mess"
     python3 testing/one_off/ingredient_trace.py --empty > empty_trace.txt
     python3 testing/one_off/ingredient_trace.py --empty --next > empty_next.txt
+    python3 testing/one_off/ingredient_trace.py --late-labels > late_labels.txt
 
 A title argument matches any recipe whose title contains it (ignoring
 case). --empty traces every recipe that parses to no ingredients at all.
@@ -22,6 +23,12 @@ case). --empty traces every recipe that parses to no ingredients at all.
 recipe, which is where a recipe's missing ingredients end up if ingest
 cut the recipe short (chunk ids are numbered in book order, see
 ingest.py).
+
+--late-labels lists component-style headings (ALL CAPS, ingredients
+right after) that sit after a recipe's instructions have started. Ingest
+keeps those inside the recipe. That's right for a variation, but wrong
+for a separate mini-recipe that has no yield line of its own, so this is
+the list to check by eye after a re-ingest.
 """
 
 import argparse
@@ -33,7 +40,8 @@ import sys
 # import path so the shared modules can be found.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from books import strategy_for  # noqa: E402
+from books import profile_for, strategy_for  # noqa: E402
+from common.text_parsing import ALLCAPS_LINE_RE, is_component_label  # noqa: E402
 from query_utils.recipe_matching import display_title, extract_title  # noqa: E402
 from scale_utils.ingredients import extract_ingredient_groups  # noqa: E402
 from testing.one_off.ingredient_frequency import load_recipes  # noqa: E402
@@ -88,6 +96,30 @@ def print_next(recipe, max_lines=12):
     print()
 
 
+def late_labels(recipe):
+    """(heading, first line after it) for every component-style heading
+    that comes after this recipe's first instruction step."""
+    profile = profile_for(strategy_for(recipe["book"]))
+    lines = recipe["text"].splitlines()
+    found = []
+    steps_started = False
+    # From where the ingredients start, since Dessert Person's "Season: ..."
+    # metadata line has the same shape as one of its steps.
+    for i in range(profile.ingredient_start(lines), len(lines)):
+        stripped = lines[i].strip()
+        # Skipped lines first, the same order extract_ingredient_groups
+        # uses: "Special Equipment: ..." also has a step's shape.
+        if profile.SKIP_RE and profile.SKIP_RE.match(stripped):
+            continue
+        if profile.STEP_RE.match(stripped):
+            steps_started = True
+        elif (steps_started and ALLCAPS_LINE_RE.match(stripped)
+              and is_component_label(lines, i, profile)):
+            following = next((l.strip() for l in lines[i + 1:] if l.strip()), "")
+            found.append((stripped, following))
+    return found
+
+
 def print_trace(key, recipe, events, parsed_count):
     title = display_title(extract_title(recipe["text"], recipe["book"]) or key)
     print("=" * 78)
@@ -108,9 +140,25 @@ if __name__ == "__main__":
                         help="trace every recipe with no parsed ingredients")
     parser.add_argument("--next", action="store_true",
                         help="also show the start of the chunk stored after each recipe")
+    parser.add_argument("--late-labels", action="store_true",
+                        help="list component headings that come after a recipe's steps")
     args = parser.parse_args()
+    if args.late_labels:
+        count = 0
+        for key, recipe in sorted(load_recipes().items()):
+            if strategy_for(recipe["book"]) is None:
+                continue
+            found = late_labels(recipe)
+            if found:
+                title = display_title(extract_title(recipe["text"], recipe["book"]) or key)
+                print(f"{title}  [{recipe['book']}]")
+                for heading, following in found:
+                    print(f"    {heading}  ->  {following}")
+                count += len(found)
+        print(f"{count} heading(s) after a recipe's steps.")
+        sys.exit(0)
     if not args.titles and not args.empty:
-        parser.error("give at least one title, or --empty")
+        parser.error("give at least one title, or --empty, or --late-labels")
 
     wanted = [t.lower() for t in args.titles]
     found = 0

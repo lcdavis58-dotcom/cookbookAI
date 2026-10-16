@@ -1,7 +1,7 @@
 """
 Small text-parsing building blocks used across books and scripts: unicode
-fraction amounts, and the ALL-CAPS line shape cookbooks use for titles
-and section headers.
+fraction amounts, the ALL-CAPS line shape cookbooks use for titles and
+section headers, and telling a component label from a new section.
 """
 
 import re
@@ -17,6 +17,37 @@ FRACTION_CHARS = "".join(FRACTIONS.keys())
 # punctuation): Book on Pie's recipe titles, and standalone section
 # headers like 'PIE PEP TALK' in any book.
 ALLCAPS_LINE_RE = re.compile(r"^[A-Z0-9][A-Z0-9 ,\-'/’]{1,59}$")
+
+# How many non-blank lines after a heading to look at for an ingredient.
+# More than one, since a component often opens with a line no parser can
+# read ("Butter for the pan") before its first measured ingredient.
+COMPONENT_LOOKAHEAD = 3
+
+
+def is_component_label(lines, i, profile, stop_at=()):
+    """Whether lines[i], a heading, labels one component's ingredients
+    ("FILLING", "MANGO CARAMEL SAUCE", "CANDIED CLEMENTINES") rather than
+    starting something new: true if one of the next COMPONENT_LOOKAHEAD
+    non-blank lines parses as an ingredient with the book's own parser
+    (profile is the book's books/ module). Component names are mostly
+    unique to their recipe, so this works without a list of them.
+
+    stop_at holds line indices that end the look-ahead early, such as the
+    lines of the next recipe's title block.
+    """
+    seen = 0
+    for j in range(i + 1, len(lines)):
+        if j in stop_at:
+            return False
+        stripped = lines[j].strip()
+        if not stripped:
+            continue
+        if profile.parse_ingredient_line(stripped):
+            return True
+        seen += 1
+        if seen >= COMPONENT_LOOKAHEAD:
+            return False
+    return False
 
 
 def parse_amount(text):

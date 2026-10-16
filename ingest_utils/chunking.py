@@ -4,7 +4,7 @@ asks the book's own module (books/) where recipes start; everything
 else here is shared by every book.
 """
 
-from common.text_parsing import ALLCAPS_LINE_RE
+from common.text_parsing import ALLCAPS_LINE_RE, is_component_label
 from common.word_list_loader import load_book_specific
 from ingest_utils.pdf_text import page_for_line
 
@@ -40,13 +40,22 @@ _DEFAULT_SUBSECTION_LABELS = [
 ]
 
 
-def find_section_starts(lines, consumed, book_title):
+def find_section_starts(lines, consumed, book_title, profile):
     """Detect standalone non-recipe section headers, like 'PIE PEP TALK' or
     'GLAZES': a short ALL-CAPS line that isn't part of any recipe's title
-    block and isn't a known in-recipe subsection label (book-specific,
-    see word_lists/books/<slug>/recipe_subsection_labels.json). These get
-    their own 'other'-tagged chunk boundary instead of silently being
-    absorbed into whichever recipe happens to come right after them.
+    block and isn't inside a recipe. These get their own 'other'-tagged
+    chunk boundary instead of silently being absorbed into whichever
+    recipe happens to come right after them.
+
+    Two kinds of ALL-CAPS line inside a recipe are not section starts:
+      - component labels ("FILLING", "MANGO CARAMEL SAUCE"), recognized by
+        an ingredient following within a few lines (is_component_label,
+        using the book's own parser, profile). Splitting at these used to
+        leave a recipe's whole ingredient list in a separate untitled
+        chunk.
+      - asides followed by prose ("NOTES", "VARIATIONS", "DO AHEAD"),
+        which can't be told apart by what follows, so they're listed per
+        book in word_lists/books/<slug>/recipe_subsection_labels.json.
     """
     labels = set(
         label.upper() for label in
@@ -59,7 +68,8 @@ def find_section_starts(lines, consumed, book_title):
         if i in consumed:
             continue
         stripped = line.strip()
-        if stripped and ALLCAPS_LINE_RE.match(stripped) and stripped not in labels:
+        if (stripped and ALLCAPS_LINE_RE.match(stripped) and stripped not in labels
+                and not is_component_label(lines, i, profile, stop_at=consumed)):
             starts.append(i)
     return starts
 
@@ -110,7 +120,7 @@ def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=
     those are only ever retrieved piecemeal, never reassembled.
     """
     recipe_starts, consumed = profile.find_recipe_starts(lines)
-    section_starts = find_section_starts(lines, consumed, book_title)
+    section_starts = find_section_starts(lines, consumed, book_title, profile)
 
     boundary_types = {i: "recipe" for i in recipe_starts}
     boundary_types.update({i: "other" for i in section_starts})
