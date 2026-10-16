@@ -94,6 +94,17 @@ def _is_wrapped_continuation(pending, line):
             or line.startswith("("))
 
 
+def _continues_skipped(skipped, line, parse):
+    """Whether `line` is the wrap of a skipped line ("Special Equipment:
+    9-inch round cake" then "pan (preferably light-colored)"), so it's skipped
+    too. Same signals as an ingredient's wrap, plus a digit start that
+    doesn't parse ("8-inch square pans (measured across the top)"), since an
+    equipment list isn't an ingredient. A capitalized line right after it,
+    like "Butter for the pan", is the list resuming."""
+    return (_is_wrapped_continuation(skipped, line)
+            or (line[:1].isdigit() and not parse(line)))
+
+
 def extract_ingredient_groups(chunk_text, strategy, trace=None):
     """Split a recipe's ingredient block into named groups using the
     book's format rules. Wrapped ingredient lines are joined back into one
@@ -132,6 +143,7 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
     in_ingredients = True
     in_aside = False
     describing = None
+    skipped_text = None
     pending = None
 
     def flush():
@@ -156,6 +168,12 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
         if in_aside:
             trace("after aside", stripped)
             continue
+        if skipped_text is not None:
+            if _continues_skipped(skipped_text, stripped, book.parse_ingredient_line):
+                skipped_text = f"{skipped_text} {stripped}"
+                trace("skipped", stripped)
+                continue
+            skipped_text = None
         heading = heading_text(stripped)
         if heading and ASIDE_LABEL_RE.match(heading):
             flush()
@@ -183,6 +201,7 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
             continue
         if book.SKIP_RE and book.SKIP_RE.match(stripped):
             flush()
+            skipped_text = stripped
             trace("skipped", stripped)
             continue
         if book.STEP_RE.match(stripped):
