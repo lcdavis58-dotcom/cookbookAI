@@ -287,12 +287,14 @@ def parse_ingredient_line(line):
 
 
 # Where the ingredient list starts: right after the yield line ("Makes 1
-# round cake"). Everything before it (title, the Season/Difficulty
-# block, intro prose) is skipped, the metadata block in particular wraps
-# unpredictably and can put a line like "20 minutes (for a parbaked
-# crust) | ..." at the start of a line, which looks exactly like a
-# count-only ingredient.
-_MAKES_RE = re.compile(r"^Makes\b")
+# round cake", or "Serves 8" for cakes and pies). Everything before it
+# (title, the Season/Difficulty block, intro prose) is skipped, the
+# metadata block in particular wraps unpredictably and can put a line
+# like "20 minutes (for a parbaked crust) | ..." at the start of a
+# line, which looks exactly like a count-only ingredient. Intro prose has
+# to be skipped too: a sentence like "So here's my secret: A good crust..."
+# has the same shape as STEP_RE and would end the list before it starts.
+_YIELD_RE = re.compile(r"^(?:Makes|Serves)\b")
 # Every instruction step in this book opens with a short bolded heading
 # and a colon ("Make the glaze: In a small saucepan..."). The first
 # one ends the ingredient list, so a wrapped instruction line that
@@ -305,11 +307,11 @@ SKIP_RE = re.compile(r"^Special Equipment:", re.IGNORECASE)
 
 def ingredient_start(lines):
     """Index of the first line that can be an ingredient: just after the
-    "Makes" line, or, if a recipe has none, just after the Difficulty
-    line that ends its metadata block (searched only near the top, so a
-    later mention of difficulty in prose doesn't count)."""
+    "Makes"/"Serves" line, or, if a recipe has neither, just after the
+    Difficulty line that ends its metadata block (searched only near the
+    top, so a later mention of difficulty in prose doesn't count)."""
     for i, line in enumerate(lines):
-        if _MAKES_RE.match(line.strip()):
+        if _YIELD_RE.match(line.strip()):
             return i + 1
     for i, line in enumerate(lines[:8]):
         if DIFFICULTY_RE.search(line):
