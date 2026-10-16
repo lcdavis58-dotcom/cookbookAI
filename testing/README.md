@@ -10,6 +10,8 @@ Diagnostic scripts used while debugging. They print output for a person to read 
 | `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF (needs the PDF, so run it on the Pi) |
 | `title_boundary_test.py` | Dessert Person title detection against 8 real title blocks |
 | `book_on_pie_line_check.py` | Book on Pie ingredient-line parsing for a set of real lines |
+| `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps (needs the database, so run it on the Pi) |
+| `ingredient_trace.py "title" [...]` or `--empty` | Line by line, what the ingredient parser decided about a stored recipe, for finding out why ingredients go missing (run it on the Pi) |
 
 Each one runs as `python3 testing/one_off/<script>.py` or `python3 -m testing.one_off.<script>`.
 

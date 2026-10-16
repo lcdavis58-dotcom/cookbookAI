@@ -1,0 +1,56 @@
+{
+  "_comment": "How parsed ingredient names are normalized for ingredient-based recipe matching (see testing/one_off/ingredient_frequency.py). Normalization only removes what doesn't change WHICH ingredient it is. Never add anything here that would merge real varieties (salted vs unsalted butter, light vs dark brown sugar, dutch-process vs natural cocoa). All words are lowercase.",
+
+  "_leading_words": "Stripped from the FRONT of a name only, repeatedly, never leaving it empty. Size, state, prep, and unit/container words a parser left behind ('4 ounces (113g) chocolate' leaves 'ounces chocolate'). Words that change the ingredient ('ground' ginger, 'toasted' sesame oil, 'whole' milk, 'dried' apricot) don't belong here.",
+  "leading_words": [
+    "large", "medium", "small", "extra-large", "jumbo",
+    "packed", "lightly", "firmly", "loosely", "heaping", "scant", "generous",
+    "cold", "chilled", "softened", "melted",
+    "very", "ripe", "overripe", "firm-ripe",
+    "fresh", "freshly", "fresh-squeezed", "frozen", "strained", "full-fat",
+    "finely", "coarsely", "roughly", "thinly", "thickly",
+    "chopped", "minced", "diced", "sliced", "grated", "sifted", "mashed",
+    "cubed", "torn", "peeled", "pitted",
+    "ounce", "ounces", "oz", "pound", "pounds", "lb", "lbs",
+    "teaspoon", "teaspoons", "tablespoon", "tablespoons", "cup", "cups",
+    "quart", "quarts", "pint", "pints",
+    "envelope", "envelopes", "package", "packages", "tube", "tubes",
+    "bunch", "bunches", "head", "heads", "sprig", "sprigs", "stalk", "stalks",
+    "clove", "cloves"
+  ],
+
+  "_leading_phrases": "Regular expressions removed from the front of a name before leading_words. Mostly leftovers from lines a parser only half understood: ranges ('7 to 14 g / 1 to 2 tablespoons cornstarch' leaves 'to 14 g / ...'), a second measure, 'plus a pinch of'.",
+  "leading_phrases": [
+    "^(?:plus\\s+)?(?:a\\s+)?(?:pinch|dash)\\s+of\\s+",
+    "^/\\s*\\S+\\s+(?:cups?|tablespoons?|teaspoons?|ounces?)\\s+",
+    "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
+    "^or\\s+\\d+\\s+",
+    "^(?:one|two|three|\\d+)\\s+[\\d.]+-ounce\\s+(?:can|package|jar|bag)\\s+",
+    "^fresh\\s+or\\s+frozen\\s+",
+    "^firm\\s+ripe\\s+"
+  ],
+
+  "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
+  "equivalents": {
+    "ice water": "water",
+    "cool water": "water",
+    "boiling water": "water",
+    "garlic clove": "garlic",
+    "pink lady apple": "sweet-tart apple",
+    "pink lady or any sweet-tart": "sweet-tart apple",
+    "hard-boiled egg yolk": "egg yolk"
+  },
+
+  "_ignore": "Normalized names left out entirely: placeholders nobody would list as something they have.",
+  "ignore": [
+    "prepared fruit",
+    "prepared fresh fruit"
+  ],
+
+  "_plural_exceptions": "Plurals the simple suffix rules would get wrong.",
+  "plural_exceptions": {
+    "leaves": "leaf", "halves": "half", "cookies": "cookie", "pies": "pie",
+    "molasses": "molasses", "greens": "greens", "grits": "grits",
+    "bitters": "bitters", "sprinkles": "sprinkles", "oats": "oats"
+  }
+}

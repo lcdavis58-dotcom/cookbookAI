@@ -33,7 +33,7 @@ def _is_wrapped_continuation(pending, line):
     return pending.count("(") > pending.count(")") or line[:1].islower()
 
 
-def extract_ingredient_groups(chunk_text, strategy):
+def extract_ingredient_groups(chunk_text, strategy, trace=None):
     """Split a recipe's ingredient block into named groups using the
     book's format rules. Wrapped ingredient lines are joined back into one
     line before parsing, so the name and the metric amount aren't lost
@@ -44,8 +44,16 @@ def extract_ingredient_groups(chunk_text, strategy):
     under it isn't a real choice to offer, or a heading worth printing).
     Whether the groups are alternatives or parts of one recipe is the
     book module's GROUPS_ARE.
+
+    trace, if given, is called as trace(kind, text) for every line, saying
+    what was decided about it ("before start", "label", "step", "parsed",
+    "rejected", ...). Only diagnostics pass it (testing/one_off/
+    ingredient_trace.py), it never changes the result.
     """
     book = profile_for(strategy)
+    if trace is None:
+        def trace(kind, text):
+            pass
     groups = {"default": []}
     current = "default"
     in_ingredients = True
@@ -57,10 +65,14 @@ def extract_ingredient_groups(chunk_text, strategy):
             parsed = book.parse_ingredient_line(pending)
             if parsed:
                 groups[current].append(parsed)
+            trace("parsed" if parsed else "rejected", pending)
             pending = None
 
     lines = chunk_text.splitlines()
-    for line in lines[book.ingredient_start(lines):]:
+    start = book.ingredient_start(lines)
+    for line in lines[:start]:
+        trace("before start", line)
+    for line in lines[start:]:
         stripped = line.strip()
         if not stripped:
             flush()
@@ -68,6 +80,7 @@ def extract_ingredient_groups(chunk_text, strategy):
         if stripped.upper() in NON_INGREDIENT_LABELS:
             flush()
             in_ingredients = False
+            trace("non-ingredient label (ends list)", stripped)
             continue
         group_name = book.section_label(stripped)
         if group_name:
@@ -75,19 +88,24 @@ def extract_ingredient_groups(chunk_text, strategy):
             current = group_name
             groups.setdefault(current, [])
             in_ingredients = True
+            trace("group label", stripped)
             continue
         if book.SKIP_RE and book.SKIP_RE.match(stripped):
             flush()
+            trace("skipped", stripped)
             continue
         if book.STEP_RE.match(stripped):
             flush()
             in_ingredients = False
+            trace("step (ends list)", stripped)
             continue
         if not in_ingredients:
+            trace("after list ended", stripped)
             continue
 
         if pending is not None and _is_wrapped_continuation(pending, stripped):
             pending = f"{pending} {stripped}"
+            trace("joined to line above", stripped)
         else:
             flush()
             pending = stripped

@@ -1,6 +1,14 @@
 # Contains the Pi's SSH password, never commit
 .vscode/sftp.json
 
+# Notes and diagnostic output that quote the cookbooks themselves. They
+# stay local so the published repo never hosts other people's book text.
+BOOK_FORMATS.md
+empty_trace.txt
+empty_next.txt
+testing/one_off/*.txt
+testing/one_off/*.csv
+
 # Python
 __pycache__/
 *.py[cod]
