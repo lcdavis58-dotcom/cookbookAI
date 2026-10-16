@@ -168,11 +168,15 @@ def analyze(recipes):
         groups = extract_ingredient_groups(text, strategy, trace=trace)
 
         names = set()
-        for ingredients in groups.values():
+        for group_name, ingredients in groups.items():
             for ing in ingredients:
                 norm, flags = normalize(ing["name"])
                 if not norm:
                     continue
+                # Everything in an optional component (OPTIONAL TOPPING)
+                # is optional, whatever the line itself says.
+                if groups.kinds.get(group_name) == "optional":
+                    flags.add("optional")
                 for flag in flags:
                     flagged[flag][norm].add(title)
                 # Sub-recipe references, garnishes and placeholders don't

@@ -13,6 +13,7 @@ Diagnostic scripts used while debugging. They print output for a person to read 
 | `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps (needs the database, so run it on the Pi) |
 | `ingredient_trace.py "title" [...]` or `--empty [--next]` | Line by line, what the ingredient parser decided about a stored recipe, for finding out why ingredients go missing (run it on the Pi) |
 | `ingredient_trace.py --late-labels` | Component-style headings that come after a recipe's steps, to check by eye after a re-ingest |
+| `ingredient_trace.py --groups` | Every recipe's ingredient groups as scaling sees them (batch, component or optional), mixed recipes first |
 
 Each one runs as `python3 testing/one_off/<script>.py` or `python3 -m testing.one_off.<script>`.
 

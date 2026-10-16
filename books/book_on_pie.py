@@ -16,7 +16,8 @@ Format, for reference:
 
 import re
 
-from common.text_parsing import ALLCAPS_LINE_RE, FRACTION_CHARS, parse_amount
+from common.text_parsing import (ALLCAPS_LINE_RE, FRACTION_CHARS, heading_text,
+                                 is_component_label, parse_amount)
 
 # ---------------------------------------------------------------------------
 # Recipe-boundary detection (ingest)
@@ -157,11 +158,11 @@ FALLBACK_LINE_RE = re.compile(rf"^(?P<amt>[\d{FRACTION_CHARS}]+)\s+(?P<name>.+)$
 # Batch-size subsections in this book are short ALL-CAPS labels ending in
 # "BATCH" (HALF BATCH, FULL BATCH, MILE-HIGH BATCH). Matching the pattern
 # rather than an exact list catches variants we haven't seen yet, without
-# also catching unrelated subsections like VARIATION or NOTE.
+# also catching unrelated subsections like VARIATION or NOTE. Batches are
+# alternative sizes of the same recipe, only one gets made; any other
+# label (FILLING, OPTIONAL TOPPING) is a component that always is (see
+# scale_utils/ingredients.group_kind).
 BATCH_LABEL_RE = re.compile(r"^[A-Z][A-Z\- ]*\bBATCH$")
-
-# Batches are alternative sizes of the same recipe, only one gets made.
-GROUPS_ARE = "batches"
 
 
 def parse_ingredient_line(line):
@@ -208,15 +209,49 @@ def parse_ingredient_line(line):
 
 
 def ingredient_start(lines):
-    """This book has no "Makes" line to anchor on (its yield is the
-    ALL-CAPS MAKES ... | DIFFICULTY header, which can wrap) and the intro
-    prose sits between that header and the ingredients. Its ingredient
-    lines are very regular though, every one starts "<n> g /", so the
-    block starts at the first such line, or at a batch label like HALF
-    BATCH, which comes just before its own ingredients."""
+    """Where the ingredient list begins. Intro prose sits between the
+    MAKES ... | DIFFICULTY header (which can wrap) and the ingredients, so
+    the list starts at the first line after that header that is an
+    ingredient (parses, including count-only lines like "8 sheets phyllo
+    dough"), a batch label (HALF BATCH), or a component label (an ALL-CAPS
+    heading with an ingredient right after it, like OPTIONAL FLAVORINGS or
+    BEEF-AND MUSHROOM FILLING). Searching only after the header keeps the
+    recipe's own ALL-CAPS title out, even when its intro is short enough
+    that an ingredient follows within a few lines.
+
+    A chunk with no MAKES header falls back to the first "<n> g /" line
+    or batch label anywhere."""
+    after_header = None
     for i, line in enumerate(lines):
-        stripped = line.strip()
-        if BATCH_LABEL_RE.match(stripped) or INGREDIENT_LINE_RE.match(stripped):
+        if MAKES_LINE_RE.match(line.strip()):
+            after_header = i + 1
+            if not DIFFICULTY_RE.search(line):
+                for j in range(i + 1, min(i + 4, len(lines))):
+                    if DIFFICULTY_RE.search(lines[j]):
+                        after_header = j + 1
+                        break
+            break
+
+    if after_header is None:
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if BATCH_LABEL_RE.match(stripped) or INGREDIENT_LINE_RE.match(stripped):
+                return i
+        return len(lines)
+
+    for i in range(after_header, len(lines)):
+        stripped = lines[i].strip()
+        if not stripped:
+            continue
+        # The difficulty rating itself can wrap onto its own line ("EASY"),
+        # only when the header ends right at "DIFFICULTY:", since a
+        # component label like FILLING has the same shape.
+        if (i == after_header and lines[i - 1].rstrip().endswith(":")
+                and DIFFICULTY_WORD_RE.match(stripped)):
+            continue
+        if BATCH_LABEL_RE.match(stripped) or parse_ingredient_line(stripped):
+            return i
+        if heading_text(stripped) and is_component_label(lines, i, parse_ingredient_line):
             return i
     return len(lines)
 

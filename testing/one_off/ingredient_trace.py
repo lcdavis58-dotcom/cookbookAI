@@ -16,6 +16,7 @@ Run from app/ (either form works):
     python3 testing/one_off/ingredient_trace.py --empty > empty_trace.txt
     python3 testing/one_off/ingredient_trace.py --empty --next > empty_next.txt
     python3 testing/one_off/ingredient_trace.py --late-labels > late_labels.txt
+    python3 testing/one_off/ingredient_trace.py --groups > groups.txt
 
 A title argument matches any recipe whose title contains it (ignoring
 case). --empty traces every recipe that parses to no ingredients at all.
@@ -55,7 +56,9 @@ TAGS = {
     "group label": "   GROUP",
     "skipped": " skipped",
     "step (ends list)": "    STEP",
-    "non-ingredient label (ends list)": "NOTE-END",
+    "aside (ends list)": "   ASIDE",
+    "after aside": "  aside.",
+    "batch description": "    DESC",
     "after list ended": "   after",
 }
 
@@ -96,6 +99,15 @@ def print_next(recipe, max_lines=12):
     print()
 
 
+def group_labels(recipe):
+    """The recipe's groups as scaling sees them, [(label, kind,
+    description)], leaving out "default" (the ingredients before any
+    label). kind is "batch", "component" or "optional"."""
+    groups = extract_ingredient_groups(recipe["text"], strategy_for(recipe["book"]))
+    return [(name, groups.kinds[name], groups.descriptions.get(name))
+            for name in groups if name != "default"]
+
+
 def late_labels(recipe):
     """(heading, first line after it) for every component-style heading
     that comes after this recipe's first instruction step."""
@@ -114,7 +126,7 @@ def late_labels(recipe):
         if profile.STEP_RE.match(stripped):
             steps_started = True
         elif (steps_started and ALLCAPS_LINE_RE.match(stripped)
-              and is_component_label(lines, i, profile)):
+              and is_component_label(lines, i, profile.parse_ingredient_line)):
             following = next((l.strip() for l in lines[i + 1:] if l.strip()), "")
             found.append((stripped, following))
     return found
@@ -142,6 +154,9 @@ if __name__ == "__main__":
                         help="also show the start of the chunk stored after each recipe")
     parser.add_argument("--late-labels", action="store_true",
                         help="list component headings that come after a recipe's steps")
+    parser.add_argument("--groups", action="store_true",
+                        help="list every recipe's group labels and whether batches and "
+                             "components are mixed")
     args = parser.parse_args()
     if args.late_labels:
         count = 0
@@ -157,8 +172,29 @@ if __name__ == "__main__":
                 count += len(found)
         print(f"{count} heading(s) after a recipe's steps.")
         sys.exit(0)
+    if args.groups:
+        rows = []
+        for key, recipe in sorted(load_recipes().items()):
+            if strategy_for(recipe["book"]) is None:
+                continue
+            labels = group_labels(recipe)
+            if labels:
+                kinds = {kind for _, kind, _ in labels}
+                shape = ("MIXED" if "batch" in kinds and kinds - {"batch"}
+                         else "batches" if kinds == {"batch"} else "components")
+                title = display_title(extract_title(recipe["text"], recipe["book"]) or key)
+                rows.append((shape, recipe["book"], title, labels))
+        order = {"MIXED": 0, "batches": 1, "components": 2}
+        for shape, book, title, labels in sorted(rows, key=lambda r: (order[r[0]], r[1], r[2])):
+            print(f"[{shape}] {title}  [{book}]")
+            for label, kind, description in labels:
+                print(f"    {kind:>9}  {label}" + (f"  ({description})" if description else ""))
+        counts = {s: sum(1 for r in rows if r[0] == s) for s in order}
+        print(f"{len(rows)} recipe(s) with group labels: {counts['MIXED']} mixed, "
+              f"{counts['batches']} batches only, {counts['components']} components only.")
+        sys.exit(0)
     if not args.titles and not args.empty:
-        parser.error("give at least one title, or --empty, or --late-labels")
+        parser.error("give at least one title, or --empty, --late-labels or --groups")
 
     wanted = [t.lower() for t in args.titles]
     found = 0

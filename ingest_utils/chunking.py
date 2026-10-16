@@ -69,7 +69,8 @@ def find_section_starts(lines, consumed, book_title, profile):
             continue
         stripped = line.strip()
         if (stripped and ALLCAPS_LINE_RE.match(stripped) and stripped not in labels
-                and not is_component_label(lines, i, profile, stop_at=consumed)):
+                and not is_component_label(lines, i, profile.parse_ingredient_line,
+                                           stop_at=consumed)):
             starts.append(i)
     return starts
 

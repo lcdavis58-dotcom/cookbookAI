@@ -22,7 +22,6 @@ import re
 from fractions import Fraction
 
 from common.text_parsing import FRACTION_CHARS, parse_amount
-from common.word_list_loader import load_book_specific
 
 # ---------------------------------------------------------------------------
 # Recipe-boundary detection (ingest)
@@ -170,8 +169,9 @@ _TSP_PER_STICK = 8 * _TSP_PER_TBSP
 _UNIT_TSP = {"teaspoon": 1, "tablespoon": _TSP_PER_TBSP,
              "stick": _TSP_PER_STICK, "cup": _TSP_PER_CUP}
 
-# Components of one recipe (Cake, Glaze, Filling), all of which get made.
-GROUPS_ARE = "components"
+# This book has no alternative batch sizes, every label (CAKE, GLAZE,
+# MANGO CARAMEL SAUCE) is a component that always gets made.
+BATCH_LABEL_RE = None
 
 
 def _parse_amount(text):
@@ -319,16 +319,8 @@ def ingredient_start(lines):
     return 0
 
 
-def _load_section_labels():
-    """ALL-CAPS component labels (CAKE, GLAZE, FILLING, etc.), loaded from
-    the book-specific word list so the list stays editable without
-    touching this file."""
-    data = load_book_specific("Dessert Person", "recipe_subsection_labels.json", {"labels": []})
-    return {label.upper() for label in data.get("labels", [])}
-
-
 def section_label(line):
-    """A component label (CAKE, GLAZE, FILLING) starts a new ingredient
-    group, returns its display name, or None."""
-    label = line.upper()
-    return label.title() if label in _load_section_labels() else None
+    """No labels of this book's own: its component labels (CAKE, GLAZE,
+    MANGO CARAMEL SAUCE) are all ALL-CAPS headings followed by their
+    ingredients, which the shared engine already recognizes."""
+    return None

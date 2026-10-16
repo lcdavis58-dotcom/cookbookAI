@@ -24,13 +24,24 @@ ALLCAPS_LINE_RE = re.compile(r"^[A-Z0-9][A-Z0-9 ,\-'/’]{1,59}$")
 COMPONENT_LOOKAHEAD = 3
 
 
-def is_component_label(lines, i, profile, stop_at=()):
+# Circled footnote markers some books print after a heading ("MARMALADE ②").
+_FOOTNOTE_MARK_RE = re.compile(r"\s*[①-⑳]+\s*$")
+
+
+def heading_text(line):
+    """The ALL-CAPS heading on this line, without any trailing footnote
+    marker, or None if the line isn't one."""
+    text = _FOOTNOTE_MARK_RE.sub("", line.strip())
+    return text if ALLCAPS_LINE_RE.match(text) else None
+
+
+def is_component_label(lines, i, parse, stop_at=()):
     """Whether lines[i], a heading, labels one component's ingredients
     ("FILLING", "MANGO CARAMEL SAUCE", "CANDIED CLEMENTINES") rather than
     starting something new: true if one of the next COMPONENT_LOOKAHEAD
     non-blank lines parses as an ingredient with the book's own parser
-    (profile is the book's books/ module). Component names are mostly
-    unique to their recipe, so this works without a list of them.
+    (parse, the book module's parse_ingredient_line). Component names are
+    mostly unique to their recipe, so this works without a list of them.
 
     stop_at holds line indices that end the look-ahead early, such as the
     lines of the next recipe's title block.
@@ -42,7 +53,7 @@ def is_component_label(lines, i, profile, stop_at=()):
         stripped = lines[j].strip()
         if not stripped:
             continue
-        if profile.parse_ingredient_line(stripped):
+        if parse(stripped):
             return True
         seen += 1
         if seen >= COMPONENT_LOOKAHEAD:

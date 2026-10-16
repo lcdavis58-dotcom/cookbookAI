@@ -9,10 +9,12 @@ used by all three main scripts:
     parse_ingredient_line(line)      scale: one ingredient line -> dict
     ingredient_start(lines)          scale: where the ingredient list begins
     STEP_RE                          scale: an instruction step (ends the list)
-    section_label(line)              scale: group name if the line starts one
+    section_label(line)              scale: group name for a label shape of the
+                                     book's own, or None (ALL-CAPS component
+                                     labels are found by the shared engine)
+    BATCH_LABEL_RE                   scale: labels that are alternative batch
+                                     sizes (scale ONE of them), or None
     SKIP_RE                          scale: lines to ignore in the list, or None
-    GROUPS_ARE                       "batches" (scale ONE group) or
-                                     "components" (scale ALL groups)
 
 Adding a book: write a module with those names, then add it to both
 tables below.

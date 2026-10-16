@@ -21,7 +21,7 @@ supports tool calling (llama3.2:1b does).
 """
 
 from common import cli
-from books import profile_for, strategy_for
+from books import strategy_for
 from query_utils.recipe_matching import (display_title, extract_title, extract_yield_line,
                                          find_recipe_header_matches)
 from query_utils.retrieval import full_recipe_text, retrieve
@@ -116,28 +116,26 @@ def scale_recipe(question):
                 print(f"[debug]   {name}: {ing['raw']!r}")
         print()
 
-    if profile_for(strategy).GROUPS_ARE == "components":
-        # Groups are parts of ONE recipe (Dessert Person's Cake, Glaze,
-        # Filling), all of which get made, so every group is scaled
-        # together. The grouping is only kept for display.
-        sections = groups
-        show_section_headers = list(sections) not in ([], ["default"])
-        batch_note = ""
-    else:
-        # Groups are alternative BATCH SIZES (Book on Pie's Half, Full,
-        # Mile-High), only one of which gets made, so exactly one group
-        # is picked and scaled.
-        batch_name = pick_default_batch(groups)
-
+    # Batch groups are alternative sizes (Book on Pie's Half, Full,
+    # Mile-High), only one of which gets made, so exactly one is picked.
+    # Every other group is a component (a Filling, a Glaze, the
+    # ingredients before any label) and is always scaled along with it.
+    batch_note = ""
+    batches = groups.batches
+    if batches:
+        batch_name = pick_default_batch({name: groups[name] for name in batches})
         if batch_name is None:
             print(f"'{title}' has multiple batch sizes and no single default. Which one do you want?\n")
-            for name in groups:
-                print(f"  - {name}")
+            for name in batches:
+                description = groups.descriptions.get(name)
+                print(f"  - {name}" + (f" ({description})" if description else ""))
             return
-
-        sections = {batch_name: groups[batch_name]}
-        show_section_headers = False
-        batch_note = f" ({batch_name})" if batch_name != "default" else ""
+        batch_note = f" ({batch_name})"
+        sections = {name: ings for name, ings in groups.items()
+                    if name == batch_name or name not in batches}
+    else:
+        sections = dict(groups)
+    show_section_headers = len(sections) > 1
 
     ingredients = [ing for section in sections.values() for ing in section]
     if not ingredients:
@@ -187,7 +185,10 @@ def scale_recipe(question):
         if not section_ingredients:
             continue
         if show_section_headers:
-            print(f"{section_name}:")
+            # "default" holds the ingredients before the first label.
+            heading = "Base" if section_name == "default" else section_name
+            optional = " (optional)" if groups.kinds.get(section_name) == "optional" else ""
+            print(f"{heading}{optional}:")
         for ing in scale_ingredients(section_ingredients, factor):
             print_scaled_ingredient(ing)
 
