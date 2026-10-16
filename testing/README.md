@@ -8,6 +8,7 @@ Diagnostic scripts used while debugging. They print output for a person to read 
 | Script | What it shows |
 |---|---|
 | `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF (needs the PDF, so run it on the Pi) |
+| `dump_blocks.py "Book Title" "text"` | The PDF text blocks on each page containing the text, with positions and the gap above each block (needs the PDF, so run it on the Pi) |
 | `title_boundary_test.py` | Dessert Person title detection against 8 real title blocks |
 | `book_on_pie_line_check.py` | Book on Pie ingredient-line parsing for a set of real lines |
 | `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps (needs the database, so run it on the Pi) |
