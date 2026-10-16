@@ -22,7 +22,13 @@ python3 scale.py "the chocolate whipped cream feeds 6, I need 10"
 python3 scale.py "classic whipped cream needs 2 eggs, I only have 1"
 ```
 
-Add `-d` to either command for debug output.
+**Find recipes from what you have** (`match.py`): lists recipes you can make now, and ones missing just one thing, from the ingredients you name. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand.
+
+```
+python3 match.py "pecans, cream cheese, lemons"
+```
+
+Add `-d` to any of these commands for debug output.
 
 ## Setup
 
@@ -62,7 +68,7 @@ Run every script from `app/`.
 | `ingest.py`, `ingest_utils/` | PDF → text → recipe-aware chunks → Chroma |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title matching |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
-| `match_utils/` | Ingredient name normalization and the recipe index (built at ingest) |
+| `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest), matching |
 | `books/` | Per-book format rules (recipe boundaries, titles, ingredient lines) |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |

@@ -19,6 +19,8 @@ Entry shape:
                   lines and everything in an optional group
     sub_recipes   other recipes it calls for, as written ("Brioche
                   Dough (this page)"), not matched for now
+    your_choice   required placeholders that can't be matched ("prepared
+                  fruit" in an any-fruit recipe), shown, never counted
     groups        group name -> batch / component / optional
 """
 
@@ -77,12 +79,18 @@ def index_entry(recipe_id, recipe):
         return None
     groups = extract_ingredient_groups(text, strategy)
 
-    required, optional, sub_recipes = [], [], []
+    required, optional, sub_recipes, your_choice = [], [], [], []
     for group_name, ingredients in groups.items():
         in_optional_group = groups.kinds.get(group_name) == "optional"
         for ing in ingredients:
             name, flags = normalize(ing["name"])
-            if not name or "ignored" in flags:
+            if not name:
+                continue
+            if "ignored" in flags:
+                # A placeholder like "prepared fruit" can't be matched, but
+                # it's still something the recipe needs.
+                if not in_optional_group and "optional" not in flags and name not in your_choice:
+                    your_choice.append(name)
                 continue
             if "sub_recipe" in flags:
                 if ing["name"] not in sub_recipes:
@@ -109,6 +117,7 @@ def index_entry(recipe_id, recipe):
         "ingredients": required,
         "optional": optional,
         "sub_recipes": sub_recipes,
+        "your_choice": your_choice,
         "groups": {name: groups.kinds[name] for name in groups if name != "default"},
     }
 

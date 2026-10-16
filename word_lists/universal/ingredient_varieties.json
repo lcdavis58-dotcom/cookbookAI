@@ -1,0 +1,13 @@
+{
+  "_comment": "When someone lists a general name ('butter', 'cheese', 'milk'), matching takes any ingredient ending in that name as a variety of it ('unsalted butter', 'parmesan cheese', 'whole milk') and says so in the result. These are the names that end the same way but are different foods, so they're never taken as varieties: listing 'cheese' doesn't mean having cream cheese. Matched against the end of an ingredient name, so 'nut butter' also covers 'smooth nut butter'. Add pairs as they come up.",
+  "not_varieties": {
+    "butter": ["peanut butter", "nut butter", "almond butter", "apple butter", "cookie butter", "cocoa butter", "cashew butter"],
+    "cheese": ["cream cheese"],
+    "cream": ["ice cream", "sour cream", "whipped cream", "coconut cream"],
+    "milk": ["coconut milk", "almond milk", "oat milk", "sweetened condensed milk", "malted milk", "nonfat dry milk"],
+    "oil": ["lemon oil", "coconut oil"],
+    "flour": ["almond flour", "coconut flour", "rice flour", "buckwheat flour", "rye flour", "spelt flour", "flax meal"],
+    "water": ["orange blossom water", "rose water", "tonic water"],
+    "pepper": ["red bell pepper", "yellow bell pepper", "bell pepper", "cayenne pepper", "peppadew pepper", "aleppo pepper"]
+  }
+}

@@ -28,6 +28,8 @@
     "^(?:one|two|three|\\d+)\\s+[\\d.]+-ounce\\s+(?:can|package|jar|bag)\\s+",
     "^plus\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
     "^to\\s+\\d+\\s+",
+    "^(?:juice|zest)\\s+of\\s+[\\d½¼¾]+\\s+",
+    "^wide\\s+strips?\\s+",
     "^[\\d.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
     "^fresh\\s+or\\s+frozen\\s+",
     "^[\\d½¼¾]+-inch\\s*(?:/\\s*[\\d.]+-cm\\s*)?(?:pieces?\\s+)?",
@@ -37,6 +39,7 @@
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
   "equivalents": {
     "sugar": "granulated sugar",
+    "diamond crystal kosher salt": "kosher salt",
     "ice water": "water",
     "cool water": "water",
     "boiling water": "water",

@@ -35,6 +35,10 @@ _SUB_RECIPE_RE = re.compile(r"\bbatch\b|\bpage\s+\d+|\brecipes?\b|\bthis page\b"
 _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|garnish|topping)\b"
                           r"|\bfor the (?:pan|pans|baking sheet|work surface)\b")
 
+# A list at the start of a name that ends in "or"/"and": "gruyère,
+# manchego, or parmesan", "honey, olive oil, and a lemon wedge".
+_COMMA_LIST_RE = re.compile(r"^([^,]+(?:,\s*[^,]+?)+),\s*(or|and/or|and)\s+([^,]+)")
+
 # "X or Y", "X and/or Y" inside a normalized name.
 _ALTERNATIVE_SPLIT_RE = re.compile(r"\s+(?:and/)?or\s+")
 # An amount left in front of an alternative: "lemon juice or 1 g / ¼
@@ -75,6 +79,11 @@ def normalize(name):
         flags.add("sub_recipe")
 
     text = _PAREN_RE.sub(" ", text)
+    # "gruyère, manchego, or parmesan" is one choice, and "flaky salt,
+    # pepper, and lemon" one list, so join those commas before cutting
+    # the prep notes off at the first remaining one.
+    text = _COMMA_LIST_RE.sub(lambda m: re.sub(r",\s*", f" {m.group(2)} ", m.group(1))
+                              + f" {m.group(2)} {m.group(3)}", text, count=1)
     text = text.split(",", 1)[0]
     text = _FOR_USE_RE.sub("", text)
     text = re.sub(r"\s+", " ", text).strip(" .;:-")
@@ -91,7 +100,8 @@ def normalize(name):
             if stripped:
                 joined = stripped
         words = joined.split()
-        if len(words) > 1 and words[0] in LEADING_WORDS:
+        # Not when the word is one side of a choice ("chopped or torn ...").
+        if len(words) > 1 and words[0] in LEADING_WORDS and words[1] not in ("or", "and", "and/or"):
             words = words[1:]
         if words == before:
             break
