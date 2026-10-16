@@ -20,7 +20,7 @@ import ollama
 from common import cli
 from query_utils.recipe_matching import (display_title, extract_title,
                                          find_recipe_header_matches, semantic_top_recipe_guess)
-from query_utils.retrieval import full_recipe_text, retrieve
+from query_utils.retrieval import full_recipe_text, retrieve, within_distance
 
 CHAT_MODEL = "llama3.2:1b"  # or your custom "cookbook-assistant" model
 
@@ -75,12 +75,10 @@ def build_context(hits):
 
 
 def ask(question):
+    # Title matching looks at every retrieved hit, however far; only the
+    # LLM fallback below is limited to hits within MAX_DISTANCE.
     hits = retrieve(question)
-
-    if not hits:
-        print("I couldn't find anything relevant to that in your cookbooks.")
-        return
-
+    relevant = within_distance(hits)
     header_matches = find_recipe_header_matches(hits, question)
 
     # Diagnostic comparison, not used for the actual decision below.
@@ -88,7 +86,7 @@ def ask(question):
     # so real queries can be checked for agreement/disagreement over time
     # before considering whether to trust this signal for anything.
     if cli.DEBUG:
-        semantic_guess = semantic_top_recipe_guess(hits)
+        semantic_guess = semantic_top_recipe_guess(relevant)
         semantic_title = (extract_title(semantic_guess["text"], semantic_guess["book"])
                           if semantic_guess else "(too close to call)")
         word_match_titles = [extract_title(h["text"], h["book"]) for h in header_matches]
@@ -120,7 +118,10 @@ def ask(question):
     # books that have no recipe-aware chunking profile. Only the closest
     # LLM_CONTEXT_K hits get sent, keeping the prompt (and generation time)
     # small even though we searched more broadly above.
-    llm_hits = hits[:LLM_CONTEXT_K]
+    if not relevant:
+        print("I couldn't find anything relevant to that in your cookbooks.")
+        return
+    llm_hits = relevant[:LLM_CONTEXT_K]
     context = build_context(llm_hits)
     user_prompt = f"Cookbook excerpts:\n\n{context}\n\nQuestion: {question}"
 

@@ -85,6 +85,12 @@ def find_recipe_header_matches(hits, question):
     title. Titles are short and specific, so requiring full title
     coverage (regardless of what else is in the question) is the more
     robust check.
+
+    When one matching title is entirely contained in another ("Pie" and
+    "Pumpkin Pie", or "Whipped Cream" and "Classic Whipped Cream"), only
+    the more specific one is kept: the question named the longer title,
+    the shorter one just happens to share its words. Two titles with the
+    same words in different books are both kept, that's a real choice.
     """
     book_names = {h.get("book") for h in hits}
     cleaned_question = strip_book_name_mentions(question, book_names)
@@ -106,9 +112,10 @@ def find_recipe_header_matches(hits, question):
         title_words = [w.strip(string.punctuation).lower() for w in match_title.split()]
         title_words = [w for w in title_words if w]
         if title_words and all(tw in question_words for tw in title_words):
-            matches.append(h)
+            matches.append((h, set(title_words)))
             seen_titles.add(title)
-    return matches
+    return [h for h, words in matches
+            if not any(words < other for _, other in matches)]
 
 
 def semantic_top_recipe_guess(hits, margin_ratio=1.15):

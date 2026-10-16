@@ -26,9 +26,13 @@ TITLE_SEARCH_K = 20
 # Based on real data from this book: relevant whipped cream chunks topped
 # out around 227, the best "irrelevant" match (a lasagna query against a
 # pie book) came in at 264. This is a THIN margin from two data points,
-# test more positive/negative examples before trusting it fully, and
-# re-check it any time you change chunk size, embedding model, or ingest
-# a book with very different content density.
+# and it moves whenever chunks change: after recipes were re-chunked to
+# keep their components, Classic Whipped Cream came in at 247 for "double
+# the classic whipped cream". So it only decides what's close enough to
+# hand to the model (within_distance), never whether a recipe named in
+# the question is found: title matching (query_utils/recipe_matching.py)
+# looks at every retrieved hit, however far, because requiring every
+# title word in the question is already a strong check on its own.
 MAX_DISTANCE = 240
 
 
@@ -38,6 +42,9 @@ def get_collection():
 
 
 def retrieve(question, top_k=TITLE_SEARCH_K):
+    """The top_k chunks closest to the question, closest first, however
+    far away. Filter with within_distance for anything that should only
+    see relevant chunks."""
     t0 = time.time()
     collection = get_collection()
 
@@ -69,13 +76,20 @@ def retrieve(question, top_k=TITLE_SEARCH_K):
         for h in all_hits:
             # Flatten newlines so each candidate stays on one line.
             preview = " / ".join(l.strip() for l in h["text"][:80].splitlines() if l.strip())
-            kept = "" if h["distance"] <= MAX_DISTANCE else "  [over MAX_DISTANCE, dropped]"
+            kept = "" if h["distance"] <= MAX_DISTANCE else "  [over MAX_DISTANCE, title matching only]"
             part = f" part {h['part'] + 1}/{h['part_count']}" if h["part_count"] > 1 else ""
             print(f"  distance={h['distance']:.4f}  {h['book']} p.{h['page']} "
                   f"[{h['content_type']}{part}]  \"{preview}...\"{kept}")
         print("-----------------------------------------------------------")
 
-    return [h for h in all_hits if h["distance"] <= MAX_DISTANCE]
+    return all_hits
+
+
+def within_distance(hits):
+    """The hits close enough to the question to count as relevant: what
+    gets handed to the model, and what decides "nothing relevant found"
+    when no recipe title matched."""
+    return [h for h in hits if h["distance"] <= MAX_DISTANCE]
 
 
 def full_recipe_text(hit):

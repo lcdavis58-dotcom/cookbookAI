@@ -24,7 +24,7 @@ from common import cli
 from books import strategy_for
 from query_utils.recipe_matching import (display_title, extract_title, extract_yield_line,
                                          find_recipe_header_matches)
-from query_utils.retrieval import full_recipe_text, retrieve
+from query_utils.retrieval import full_recipe_text, retrieve, within_distance
 from scale_utils.ingredients import extract_ingredient_groups, pick_default_batch
 from scale_utils.measurement_display import count_unit_label, format_imperial_amount, to_teaspoons
 from scale_utils.pan_scaling import detect_pan_request, pan_scale_factor_from_question
@@ -85,13 +85,12 @@ def print_scaled_ingredient(ing):
 
 def scale_recipe(question):
     hits = retrieve(question)
-    if not hits:
-        print("I couldn't find anything relevant to that in your cookbooks.")
-        return
-
     header_matches = find_recipe_header_matches(hits, question)
 
     if not header_matches:
+        if not within_distance(hits):
+            print("I couldn't find anything relevant to that in your cookbooks.")
+            return
         print("I couldn't identify a specific recipe to scale from your request.")
         print('Try including the exact recipe name, e.g. "double the classic whipped cream recipe".')
         return
