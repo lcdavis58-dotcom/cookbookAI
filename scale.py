@@ -50,6 +50,11 @@ def format_side(amount, unit, rounded=False):
 
 
 def print_scaled_ingredient(ing):
+    if ing["unmeasured"]:
+        # "Butter for the pan", "Egg wash": no amount to scale.
+        print(f"  {ing['name']}  (as needed, not scaled)")
+        return
+
     # A compound amount ("3 tablespoons plus 1/3 cup") is stored as one
     # number in its larger unit, show the book's own wording instead.
     imperial_unit = ing["imperial_unit"]
@@ -76,6 +81,10 @@ def print_scaled_ingredient(ing):
         imperial_str = f"{'~' if imp_rounded else ''}{imp_display}"
 
     scaled = " / ".join(filter(None, [metric_str, imperial_str]))
+
+    # "scant 1 g" scales to "scant 2 g": the hedge stays with the amount.
+    if ing["qualifier"]:
+        orig, scaled = f"{ing['qualifier']} {orig}", f"{ing['qualifier']} {scaled}"
 
     print(f"  {ing['name']}: {orig}  ->  {scaled}")
     for flag_type, note in ing["flags"]:

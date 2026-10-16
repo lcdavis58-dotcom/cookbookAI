@@ -156,7 +156,9 @@ _SINGLE_RE = re.compile(rf"^({_NUM})\s*({_UNIT})\s+", re.IGNORECASE)
 _COMPOUND_RE = re.compile(
     rf"^({_NUM})\s*({_UNIT})\s+plus\s+({_NUM})\s*({_UNIT})\s+", re.IGNORECASE
 )
-_COUNT_RE = re.compile(rf"^({_NUM})\s+(?=[A-Za-z])")
+# A count, then the name, or a size in parentheses first: "2 (3-inch)
+# cinnamon sticks", "1 (750 ml) bottle dry rosé wine".
+_COUNT_RE = re.compile(rf"^({_NUM})\s+(?=[A-Za-z(])")
 _INSTRUCTION_RE = re.compile(r"^\d+\.\s")
 _TYPED_FRACTION_RE = re.compile(r"^(?:(\d+)\s+)?(\d+)[/⁄](\d+)$")
 

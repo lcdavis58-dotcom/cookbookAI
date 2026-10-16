@@ -11,6 +11,7 @@ cookbook data at all.
 
 import json
 import os
+import re
 
 from common.config import PROJECT_ROOT
 
@@ -41,18 +42,27 @@ def check_ingredient_flags(ingredient_name):
     non_scalable_rules = load_ingredient_rules(NON_SCALABLE_PATH)
     storage_rules = load_ingredient_rules(STORAGE_SENSITIVE_PATH)
 
-    name_lower = ingredient_name.lower()
+    # Only the ingredient itself, not its prep notes after the first comma:
+    # "pie crust (see Recommended Crusts), brushed with egg wash" is a
+    # crust, not an egg.
+    name_lower = ingredient_name.lower().split(",", 1)[0]
     flags = []
 
     for rule in non_scalable_rules:
-        if rule["keyword"].lower() in name_lower:
+        if _keyword_matches(rule["keyword"], name_lower):
             flags.append(("non_scalable", rule["note"]))
 
     for rule in storage_rules:
-        if rule["keyword"].lower() in name_lower:
+        if _keyword_matches(rule["keyword"], name_lower):
             flags.append(("storage_sensitive", rule["note"]))
 
     return flags
+
+
+def _keyword_matches(keyword, name):
+    """Whole-word match, plural allowed: "egg" matches "large eggs" and
+    "egg whites" but not "eggplant"."""
+    return re.search(rf"\b{re.escape(keyword.lower())}(?:s|es)?\b", name) is not None
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ import re
 
 from books import profile_for
 from common.text_parsing import heading_text, is_component_label
+from scale_utils.line_fallbacks import parse_fallback
 
 # Asides at the end of a recipe ("DO AHEAD", "NOTES", "VARIATION 2"). Once
 # one starts, nothing after it belongs in the scaled list: a variation's
@@ -77,7 +78,7 @@ def group_kind(label, book):
 
 def _is_wrapped_continuation(pending, line):
     """Whether `line` is the PDF's line-wrap of the ingredient line before
-    it rather than a new line of its own. Two signals, either is enough:
+    it rather than a new line of its own. Any of three signals is enough:
       - the previous line left a parenthesis open, e.g. "coarsely chopped
         (2.1 oz /" followed by "60g)". This one wins even when the next
         line starts with a digit.
@@ -85,8 +86,12 @@ def _is_wrapped_continuation(pending, line):
         Ingredient lines start with an amount, and the few that don't
         ("Neutral oil for the pan", "Flaky salt, for sprinkling") start
         with a capital, so a lowercase start can only be a continuation.
+      - the line starts with "(", an aside about the line above, like
+        "(optional)" or "(about 3 medium)". A batch label's own "(for
+        ...)" description is taken before this is ever asked.
     """
-    return pending.count("(") > pending.count(")") or line[:1].islower()
+    return (pending.count("(") > pending.count(")") or line[:1].islower()
+            or line.startswith("("))
 
 
 def extract_ingredient_groups(chunk_text, strategy, trace=None):
@@ -94,6 +99,10 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
     book's format rules. Wrapped ingredient lines are joined back into one
     line before parsing, so the name and the metric amount aren't lost
     when the PDF breaks a long ingredient across two lines.
+
+    A line the book's own parser rejects gets a second try with the
+    book-independent fallbacks in scale_utils/line_fallbacks.py ("Pinch
+    of salt", "Scant 1 g / ...", "Butter for the pan").
 
     A group label is either one the book itself recognizes (its
     section_label, e.g. Book on Pie's "FULL BATCH"), or any ALL-CAPS
@@ -128,7 +137,8 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
     def flush():
         nonlocal pending
         if pending is not None:
-            parsed = book.parse_ingredient_line(pending)
+            parsed = (book.parse_ingredient_line(pending)
+                      or parse_fallback(pending, book.parse_ingredient_line))
             if parsed:
                 groups[current].append(parsed)
             trace("parsed" if parsed else "rejected", pending)

@@ -93,7 +93,8 @@ def determine_scale_intent(question, recipe_title, yield_line, ingredients):
     (CHAT_MODEL can be swapped independently of query.py's chat model).
     """
     ingredient_list_text = "\n".join(
-        f"- {ing['name']}: "
+        f"- {ing['name']}: as needed" if ing.get("unmeasured") else
+        f"- {ing['name']}: {ing.get('qualifier') or ''} "
         f"{ing['metric_amount']} {ing['metric_unit'] or ''} "
         f"/ {ing.get('imperial_display') or ing['imperial_amount']} "
         f"{'' if ing.get('imperial_display') else ing['imperial_unit'] or ''}".strip()
@@ -257,7 +258,11 @@ def resolve_scale_factor(intent, ingredients):
         if not ref or not target_amt:
             return None, "Missing reference ingredient or target amount"
 
-        matches = [ing for ing in ingredients if ref in ing["name"].lower()]
+        # An ingredient with no amount ("Egg wash", "Butter for the pan")
+        # can't set a scale factor, and leaving it out keeps "I only have
+        # 1 egg" from also matching "Egg wash".
+        matches = [ing for ing in ingredients
+                   if ref in ing["name"].lower() and not ing.get("unmeasured")]
         if not matches:
             return None, f'Could not find "{ref}" in this recipe\'s ingredients'
         if len(matches) > 1:
@@ -326,6 +331,8 @@ def scale_ingredients(ingredients, factor):
             "scaled_metric": scaled_metric,
             "scaled_metric_rounded": scaled_metric_rounded,
             "scaled_imperial": scaled_imperial,
+            "qualifier": ing.get("qualifier"),
+            "unmeasured": ing.get("unmeasured", False),
             "flags": check_ingredient_flags(ing["name"]),
         })
     return scaled

@@ -53,7 +53,12 @@ PLURAL_EXCEPTIONS = RULES.get("plural_exceptions", {})
 _FOR_USE_RE = re.compile(
     r"\s+for\s+(?:the\s+\w+|serving|sprinkling|dusting|brushing|greasing|garnish|topping)\b.*$")
 _PAREN_RE = re.compile(r"\([^()]*\)?")
-_SUB_RECIPE_RE = re.compile(r"^(?:recipe|batch)\b|\bpage\s+\d+|\brecipe\b")
+# A pointer to another recipe in the book: "1 recipe Brioche Dough",
+# "Flaky All-Butter Pie Dough (this page)", "One 9-inch pie crust (see
+# Recommended Crusts)", "Pie dough for a double crust (see below)",
+# "Full Batch of Classic Whipped Cream".
+_SUB_RECIPE_RE = re.compile(r"\bbatch\b|\bpage\s+\d+|\brecipes?\b|\bthis page\b"
+                            r"|\bsee below\b|\brecipe follows\b|\bcrusts?\b")
 _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|garnish|topping)\b"
                           r"|\bfor the (?:pan|pans|baking sheet|work surface)\b")
 

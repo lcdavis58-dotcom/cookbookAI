@@ -1,5 +1,5 @@
 {
-  "_comment": "Ingredients matched here are discrete/countable items where a fractional scaled amount isn't practical to use. 'keyword' is matched as a case-insensitive substring against each parsed ingredient name, so 'egg' also catches 'large eggs', 'egg whites', 'egg yolks', etc. Add entries as you run into more of these.",
+  "_comment": "Ingredients matched here are discrete/countable items where a fractional scaled amount isn't practical to use. 'keyword' is matched as a whole word (plural allowed) against the ingredient part of each parsed name (before the first comma), so 'egg' catches 'large eggs', 'egg whites' and 'egg yolks' but not 'eggplant' or a crust 'brushed with egg wash'. Add entries as you run into more of these.",
   "ingredients": [
     {
       "keyword": "egg",

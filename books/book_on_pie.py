@@ -140,9 +140,9 @@ SKIP_RE = None
 # lines give TWO imperial measures ("57 g / 2 ounces / 4 tablespoons
 # unsalted butter"), the optional imp2 group catches the second one so it
 # doesn't end up glued to the front of the ingredient name.
-_IMP_UNIT = r"(?:packed\s+cups?|cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz)\b"
+_IMP_UNIT = r"(?:packed\s+cups?|cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?)\b"
 INGREDIENT_LINE_RE = re.compile(
-    rf"^(?P<metric_amt>[\d{FRACTION_CHARS}]+)\s*(?P<metric_unit>g|kg|ml|l)\s*/\s*"
+    rf"^(?P<metric_amt>\d+\.\d+|[\d{FRACTION_CHARS}]+)\s*(?P<metric_unit>g|kg|ml|l)\s*/\s*"
     rf"(?P<imp_amt>[\d{FRACTION_CHARS}]+)?\s*"
     rf"(?P<imp_unit>{_IMP_UNIT})?\s*"
     rf"(?:/\s*(?P<imp2_amt>[\d{FRACTION_CHARS}]+)\s*(?P<imp2_unit>{_IMP_UNIT})\s*)?"
@@ -190,6 +190,9 @@ def parse_ingredient_line(line):
             "metric_unit": m.group("metric_unit"),
             "imperial_amount": parse_amount(imp_amt) if imp_amt else None,
             "imperial_unit": imp_unit,
+            # The book's own wording ("¼ cup") for the unscaled side,
+            # rather than "0.25 cup".
+            "imperial_display": f"{imp_amt} {imp_unit.strip()}" if imp_amt and imp_unit else None,
             "name": m.group("name").strip(),
         }
 
