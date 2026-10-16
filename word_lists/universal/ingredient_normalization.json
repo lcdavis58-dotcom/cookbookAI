@@ -36,6 +36,7 @@
 
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
   "equivalents": {
+    "sugar": "granulated sugar",
     "ice water": "water",
     "cool water": "water",
     "boiling water": "water",

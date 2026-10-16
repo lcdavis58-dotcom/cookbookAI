@@ -107,6 +107,20 @@ def normalize(name):
     return text, flags
 
 
+_AND_RE = re.compile(r"\s+and\s+")
+
+
+def pieces(normalized, unmeasured):
+    """The separate ingredients a normalized name stands for. A line with
+    no amount can name two ingredients ("Kosher salt and freshly ground
+    black pepper"), both needed. A measured line is one ingredient, and
+    splitting it would break names like "half-and-half"."""
+    parts = _AND_RE.split(normalized) if unmeasured else [normalized]
+    if len(parts) == 1:
+        return parts
+    return [p for p in (normalize(part)[0] for part in parts) if p]
+
+
 def options(normalized):
     """The ingredients a normalized name accepts, as a list: one name, or
     each side of an "X or Y" choice.

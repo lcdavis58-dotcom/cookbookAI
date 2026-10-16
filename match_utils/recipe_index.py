@@ -24,18 +24,14 @@ Entry shape:
 
 import json
 import os
-import re
 import string
 from collections import defaultdict
 
 from books import strategy_for
 from common.config import RECIPE_INDEX_PATH
-from match_utils.ingredient_names import normalize, options
+from match_utils.ingredient_names import normalize, options, pieces
 from query_utils.recipe_matching import display_title, extract_title
 from scale_utils.ingredients import extract_ingredient_groups
-
-
-_AND_RE = re.compile(r"\s+and\s+")
 
 
 def load_recipes():
@@ -93,17 +89,10 @@ def index_entry(recipe_id, recipe):
                     sub_recipes.append(ing["name"])
                 continue
             target = optional if in_optional_group or "optional" in flags else required
-            # A line with no amount can name two ingredients ("Kosher salt
-            # and freshly ground black pepper"), both needed. A measured
-            # line is one ingredient, and splitting it would break names
-            # like "half-and-half".
-            pieces = _AND_RE.split(name) if ing.get("unmeasured") else [name]
             # The same ingredient in two batches, or in two components,
             # is still one thing the recipe needs.
-            for piece in pieces:
-                piece = normalize(piece)[0] if len(pieces) > 1 else piece
-                if piece:
-                    _add(target, piece)
+            for piece in pieces(name, ing.get("unmeasured")):
+                _add(target, piece)
 
     # An ingredient that's required somewhere isn't also optional.
     required_names = {entry["name"] for entry in required}

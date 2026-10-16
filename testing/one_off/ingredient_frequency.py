@@ -36,7 +36,7 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from books import strategy_for  # noqa: E402
-from match_utils.ingredient_names import normalize  # noqa: E402
+from match_utils.ingredient_names import normalize, pieces  # noqa: E402
 from match_utils.recipe_index import load_recipes  # noqa: E402
 from query_utils.recipe_matching import display_title, extract_title  # noqa: E402
 from scale_utils.ingredients import extract_ingredient_groups  # noqa: E402
@@ -80,8 +80,10 @@ def analyze(recipes):
                 # Sub-recipe references, garnishes and placeholders don't
                 # say anything about what the recipe needs from the pantry.
                 if not flags & {"sub_recipe", "optional", "ignored"}:
-                    names.add(norm)
-                    raw_forms[norm][ing["name"]] += 1
+                    # Split the same way the recipe index does.
+                    for piece in pieces(norm, ing.get("unmeasured")):
+                        names.add(piece)
+                        raw_forms[piece][ing["name"]] += 1
         if names:
             per_recipe[key] = names
         else:
