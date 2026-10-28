@@ -72,8 +72,8 @@ Run every script from `app/`.
 | `books/` | Per-book format rules (recipe boundaries, titles, ingredient lines) |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
-| `tools/` | Maintenance scripts |
-| `testing/` | Diagnostic scripts (see `testing/README.md`) |
+| `tools/` | Maintenance scripts; `tools/diagnostics/` for seeing how ingest and the parsers read a book |
+| `testing/` | Tests to come, and a local-only scratch folder (see `testing/README.md`) |
 
 ## Adding a book
 

@@ -3,23 +3,13 @@
 Run everything from `app/`.
 
 ## one_off/
-Diagnostic scripts used while debugging. They print output for a person to read and don't pass or fail.
+A local scratch folder for throwaway checks and their output. Everything in it except its README is git-ignored, because those files are usually built from real book text (see `one_off/README.md`).
 
-| Script | What it shows |
-|---|---|
-| `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF (needs the PDF, so run it on the Pi) |
-| `dump_blocks.py "Book Title" "text"` | The PDF text blocks on each page containing the text, with positions and the gap above each block (needs the PDF, so run it on the Pi) |
-| `title_boundary_test.py` | Dessert Person title detection against 8 real title blocks |
-| `book_on_pie_line_check.py` | Book on Pie ingredient-line parsing for a set of real lines |
-| `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps (needs the database, so run it on the Pi) |
-| `ingredient_trace.py "title" [...]` or `--empty [--next]` | Line by line, what the ingredient parser decided about a stored recipe, for finding out why ingredients go missing (run it on the Pi) |
-| `ingredient_trace.py --late-labels` | Component-style headings that come after a recipe's steps, to check by eye after a re-ingest |
-| `ingredient_trace.py --groups` | Every recipe's ingredient groups as scaling sees them (batch, component or optional), mixed recipes first |
-
-Each one runs as `python3 testing/one_off/<script>.py` or `python3 -m testing.one_off.<script>`.
+The reusable diagnostic scripts (page and block dumps, ingredient frequency, parser traces) live in `tools/diagnostics/`.
 
 ## Real tests (to come)
-Put automated tests in `testing/unit/test_*.py` and run them with `python3 -m pytest testing`. Good first candidates, which can mostly be built from the one-off scripts above:
-- `books/*`: `find_recipe_starts`, `extract_title` and `parse_ingredient_line` on real text
-- `scale_utils/ingredients.py`: grouping and line-wrap joining
+Put automated tests in `testing/unit/test_*.py` and run them with `python3 -m pytest testing`. Test data must be invented recipe text in each book's format, never lines copied from the books, since this folder is published. Good first candidates:
+- `books/*`: `find_recipe_starts`, `extract_title` and `parse_ingredient_line`
+- `scale_utils/ingredients.py`: grouping, line-wrap joining, the fallbacks in `line_fallbacks.py`
 - `scale_utils/measurement_display.py`, `pan_scaling.py`, `recipe_scaling.resolve_scale_factor`: pure functions, no model or database needed
+- `match_utils/`: normalization, "X or Y" options, matching against a small hand-written index

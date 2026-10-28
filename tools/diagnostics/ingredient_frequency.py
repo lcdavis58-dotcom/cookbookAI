@@ -10,10 +10,10 @@ and parses them with the same extract_ingredient_groups scale.py uses,
 so it needs the database and runs on the Pi.
 
 Run from app/ (either form works):
-    python3 testing/one_off/ingredient_frequency.py
-    python3 -m testing.one_off.ingredient_frequency
-    python3 testing/one_off/ingredient_frequency.py --csv ingredients.csv
-    python3 testing/one_off/ingredient_frequency.py > report.txt
+    python3 tools/diagnostics/ingredient_frequency.py
+    python3 -m tools.diagnostics.ingredient_frequency
+    python3 tools/diagnostics/ingredient_frequency.py --csv ingredients.csv
+    python3 tools/diagnostics/ingredient_frequency.py > report.txt
 
 Normalization here is deliberately light: it only removes what doesn't
 change WHICH ingredient it is (amounts, parentheticals, prep notes after

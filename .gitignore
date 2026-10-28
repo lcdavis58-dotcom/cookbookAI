@@ -6,10 +6,12 @@
 BOOK_FORMATS.md
 empty_trace.txt
 empty_next.txt
-testing/one_off/*.txt
-testing/one_off/*.csv
-testing/one_off/*.json
 recipe_index.json
+
+# Quick throwaway checks and their output, often built from real book
+# text, so everything here stays local except the README
+testing/one_off/*
+!testing/one_off/README.md
 
 # Python
 __pycache__/

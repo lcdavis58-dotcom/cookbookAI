@@ -129,7 +129,7 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
 
     trace, if given, is called as trace(kind, text) for every line, saying
     what was decided about it ("before start", "label", "step", "parsed",
-    "rejected", ...). Only diagnostics pass it (testing/one_off/
+    "rejected", ...). Only diagnostics pass it (tools/diagnostics/
     ingredient_trace.py), it never changes the result.
     """
     book = profile_for(strategy)

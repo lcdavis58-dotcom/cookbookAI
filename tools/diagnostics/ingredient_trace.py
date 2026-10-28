@@ -11,12 +11,12 @@ what scaling sees.
 Reads the recipes stored in Chroma, so it runs on the Pi.
 
 Run from app/ (either form works):
-    python3 testing/one_off/ingredient_trace.py "rice pudding cake"
-    python3 testing/one_off/ingredient_trace.py "black forest" "eton mess"
-    python3 testing/one_off/ingredient_trace.py --empty > empty_trace.txt
-    python3 testing/one_off/ingredient_trace.py --empty --next > empty_next.txt
-    python3 testing/one_off/ingredient_trace.py --late-labels > late_labels.txt
-    python3 testing/one_off/ingredient_trace.py --groups > groups.txt
+    python3 tools/diagnostics/ingredient_trace.py "rice pudding cake"
+    python3 tools/diagnostics/ingredient_trace.py "black forest" "eton mess"
+    python3 tools/diagnostics/ingredient_trace.py --empty > empty_trace.txt
+    python3 tools/diagnostics/ingredient_trace.py --empty --next > empty_next.txt
+    python3 tools/diagnostics/ingredient_trace.py --late-labels > late_labels.txt
+    python3 tools/diagnostics/ingredient_trace.py --groups > groups.txt
 
 A title argument matches any recipe whose title contains it (ignoring
 case). --empty traces every recipe that parses to no ingredients at all.

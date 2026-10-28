@@ -3,9 +3,9 @@ Debug helper: show exactly what ingest's title detection sees for a
 book, without embedding or writing anything to Chroma.
 
 Run from app/ (either form works):
-    python3 testing/one_off/dump_pages.py "Dessert Person"          # summary only
-    python3 testing/one_off/dump_pages.py "Dessert Person" 40 42    # plus raw lines of PDF pages 40-42
-    python3 -m testing.one_off.dump_pages "Dessert Person"
+    python3 tools/diagnostics/dump_pages.py "Dessert Person"          # summary only
+    python3 tools/diagnostics/dump_pages.py "Dessert Person" 40 42    # plus raw lines of PDF pages 40-42
+    python3 -m tools.diagnostics.dump_pages "Dessert Person"
 
 Page numbers are PDF page indexes (0-based, as pymupdf counts them), not
 the printed page numbers in the book.
@@ -60,7 +60,7 @@ def dump_pages(pdf_path, first, last):
 
 if __name__ == "__main__":
     if len(sys.argv) not in (2, 4):
-        print('Usage: python3 testing/one_off/dump_pages.py "Book Title" [first_page last_page]')
+        print('Usage: python3 tools/diagnostics/dump_pages.py "Book Title" [first_page last_page]')
         print(f"Known books: {', '.join(BOOKS)}")
         sys.exit(1)
 

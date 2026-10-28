@@ -6,8 +6,8 @@ visual gap in the printed book, like the space between a recipe's
 optional ingredients and the rest, is only visible here.
 
 Needs the PDF, so run it on the Pi, from app/ (either form works):
-    python3 testing/one_off/dump_blocks.py "The Book On Pie" "PHYLLO DOUGH CRUST"
-    python3 -m testing.one_off.dump_blocks "The Book On Pie" "OPTIONAL FLAVORINGS"
+    python3 tools/diagnostics/dump_blocks.py "The Book On Pie" "PHYLLO DOUGH CRUST"
+    python3 -m tools.diagnostics.dump_blocks "The Book On Pie" "OPTIONAL FLAVORINGS"
 """
 
 import os
