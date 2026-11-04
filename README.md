@@ -88,6 +88,9 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
+- Add the remaining books
+- Check sub-recipes when matching ingredients (a recipe that calls for "1 recipe Brioche Dough" also needs that recipe's ingredients), designed once every book's way of referring to its own recipes is known
+- Forgiving recipe title lookup for scaling ("chocolate chip cookies" finding "Chocolate Chip Cookie")
 - Move from the Raspberry Pi to a GPU machine
 - A locally hosted web interface for household use
 
