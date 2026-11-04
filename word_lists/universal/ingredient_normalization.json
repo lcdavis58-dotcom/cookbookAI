@@ -6,7 +6,7 @@
     "large", "medium", "small", "extra-large", "jumbo",
     "packed", "lightly", "firmly", "loosely", "heaping", "scant", "generous",
     "cold", "chilled", "softened", "melted",
-    "very", "ripe", "overripe", "firm-ripe",
+    "very", "ripe", "overripe", "firm-ripe", "unsliced",
     "fresh", "freshly", "fresh-squeezed", "frozen", "strained", "full-fat",
     "finely", "coarsely", "roughly", "thinly", "thickly",
     "chopped", "minced", "diced", "sliced", "grated", "sifted", "mashed",
@@ -21,7 +21,9 @@
 
   "_leading_phrases": "Regular expressions removed from the front of a name before leading_words. Mostly leftovers from lines a parser only half understood: ranges ('7 to 14 g / 1 to 2 tablespoons cornstarch' leaves 'to 14 g / ...'), a second measure, 'plus a pinch of'.",
   "leading_phrases": [
-    "^(?:plus\\s+)?(?:a\\s+)?(?:pinch|dash)\\s+of\\s+",
+    "^(?:plus\\s+)?(?:a\\s+|several\\s+)?(?:pinch|dash)(?:es)?\\s+of\\s+",
+    "^(?:[a-z]+\\s+)?but\\s+\\S+\\s+",
+    "^pieces?\\s+(?:of\\s+)?",
     "^/\\s*\\S+\\s+(?:cups?|tablespoons?|teaspoons?|ounces?)\\s+",
     "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
     "^or\\s+\\d+\\s+",
@@ -50,13 +52,15 @@
   "_comma_descriptors": "Words that describe an ingredient when printed alone before a comma, BraveTart style: 'cold, unsalted butter', 'whole, ripe strawberries', 'plump, moist, dried apples'. The word and its comma are dropped, so the cut at the first comma doesn't leave just 'cold'. Only words that are never the ingredient itself belong here.",
   "comma_descriptors": [
     "whole", "plump", "moist", "sticky", "unsweetened", "cold", "medium", "large",
-    "small", "ripe", "unpeeled", "soft", "firm", "fresh"
+    "small", "ripe", "unpeeled", "soft", "firm", "fresh", "unseeded"
   ],
 
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
   "equivalents": {
     "sugar": "granulated sugar",
     "diamond crystal kosher salt": "kosher salt",
+    "morton kosher salt": "kosher salt",
+    "tablespooons unsalted butter": "unsalted butter",
     "ice water": "water",
     "cool water": "water",
     "boiling water": "water",

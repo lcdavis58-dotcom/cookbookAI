@@ -7,6 +7,7 @@ Currently supported books (each has its own settings in `books/`):
 - *Dessert Person*
 - *BraveTart*
 - *The Fearless Baker*
+- *What's For Dessert*
 
 ## What it does
 

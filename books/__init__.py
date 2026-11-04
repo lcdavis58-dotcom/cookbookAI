@@ -43,7 +43,7 @@ tools/diagnostics/book_report.py (--anchor), write a module with the
 settings, then add it to both tables below.
 """
 
-from books import book_on_pie, bravetart, dessert_person, fearless_baker
+from books import book_on_pie, bravetart, dessert_person, fearless_baker, whats_for_dessert
 from books.engine import Profile
 
 # Lowercased, stripped book title -> strategy name. The title is the one
@@ -56,6 +56,7 @@ RECIPE_AWARE_BOOKS = {
     "dessert person": "dessert_person",
     "bravetart": "bravetart",
     "the fearless baker": "fearless_baker",
+    "what's for dessert": "whats_for_dessert",
 }
 
 # Strategy name -> that book's rules: its module, with the shared
@@ -65,6 +66,7 @@ PROFILES = {
     "dessert_person": Profile(dessert_person),
     "bravetart": Profile(bravetart),
     "fearless_baker": Profile(fearless_baker),
+    "whats_for_dessert": Profile(whats_for_dessert),
 }
 
 

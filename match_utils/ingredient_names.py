@@ -31,9 +31,10 @@ _PAREN_RE = re.compile(r"\([^()]*\)?")
 # A pointer to another recipe in the book: "1 recipe Brioche Dough",
 # "Flaky All-Butter Pie Dough (this page)", "One 9-inch pie crust (see
 # Recommended Crusts)", "Pie dough for a double crust (see below)",
-# "Full Batch of Classic Whipped Cream".
+# "Full Batch of Classic Whipped Cream". Not bread with its crust cut
+# off ("1 loaf brioche, crusts removed").
 _SUB_RECIPE_RE = re.compile(r"\bbatch\b|\bpage\s+\d+|\brecipes?\b|\bthis page\b"
-                            r"|\bsee below\b|\brecipe follows\b|\bcrusts?\b")
+                            r"|\bsee below\b|\brecipe follows\b|\bcrusts?\b(?!\s+(?:removed|trimmed))")
 _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|garnish|topping)\b"
                           r"|\bfor the (?:pan|pans|baking sheet|work surface)\b")
 
@@ -49,6 +50,8 @@ _SEE_PAGE_RE = re.compile(r",?\s*see page\s+\d+")
 # "Golden syrup, such as Lyle's, or light corn syrup": a brand aside,
 # which would otherwise read as one item of a list.
 _SUCH_AS_RE = re.compile(r",?\s+such as\b.*$")
+# The bread's unit left in front of its name ("1 loaf brioche bread").
+_LOAF_RE = re.compile(r"^(?:[\w-]+\s+)?(?:loaf|loaves)\s+(?:of\s+)?")
 
 # "X or Y", "X and/or Y" inside a normalized name.
 _ALTERNATIVE_SPLIT_RE = re.compile(r"\s+(?:and/)?or\s+")
@@ -107,6 +110,8 @@ def normalize(name):
         flags.add("sub_recipe")
 
     text = _SUCH_AS_RE.sub("", _PAREN_RE.sub(" ", text)).strip()
+    # "loaf unseeded, unsliced rye bread" is rye bread.
+    text = _LOAF_RE.sub("", text)
     # "cold, unsalted butter" is unsalted butter.
     while (m := re.match(r"([\w-]+),\s*", text)) and m.group(1) in COMMA_DESCRIPTORS:
         text = text[m.end():]

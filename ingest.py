@@ -50,6 +50,7 @@ INGEST_BOOKS = [
     "Dessert Person",
     "BraveTart",
     "The Fearless Baker",
+    "What's For Dessert",
 ]
 
 

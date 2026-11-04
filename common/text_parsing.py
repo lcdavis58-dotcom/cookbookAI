@@ -19,7 +19,7 @@ FRACTION_CHARS = "".join(FRACTIONS.keys())
 # and a small set of punctuation): component labels like "FILLING",
 # "CRÈME BRÛLÉE" or "TOPPING (OPTIONAL)", and asides like "PIE PEP TALK".
 _CAPS = "A-Z0-9À-ÖØ-Þ"
-ALLCAPS_LINE_RE = re.compile(rf"^[{_CAPS}][{_CAPS} ,\-'/’&();]{{1,59}}$")
+ALLCAPS_LINE_RE = re.compile(rf"^[{_CAPS}][{_CAPS} ,\-'/’&();“”\"]{{1,59}}$")
 
 # How many non-blank lines after a heading to look at for an ingredient.
 # More than one, since a component often opens with a line no parser can

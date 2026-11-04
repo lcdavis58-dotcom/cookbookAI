@@ -6,6 +6,7 @@ with a plain amount:
     Scant 1 g / ¼ teaspoon ground cloves             qualifier, then a normal line
     Pinch of fine sea salt                            pinch / dash as the amount
     One 2-inch / 5-cm piece fresh turmeric            amount spelled out
+    ½-inch piece fresh ginger                         a size, no count
     Grated zest of 1 lime                             part of a counted ingredient
     Egg wash: 57 g / 1 large egg, beaten with ...     a name, then a normal line
     Butter for the pan                                no amount at all
@@ -23,7 +24,7 @@ from common.text_parsing import FRACTION_CHARS, heading_text, parse_amount
 # A word in front of a normal amount that hedges it. Scaling keeps the
 # word and scales the amount ("scant 1 g" -> "scant 2 g").
 _QUALIFIER_RE = re.compile(
-    rf"^(scant|about|up to|generous|heaping|roughly|approximately)\s+(?=[\d{FRACTION_CHARS}])",
+    rf"^(scant|about|up to|generous|heaping|roughly|approximately|a pinch plus)\s+(?=[\d{FRACTION_CHARS}])",
     re.IGNORECASE)
 
 _PINCH_RE = re.compile(r"^(?:an?\s+)?(?:(small|large|generous|big|hefty)\s+)?(pinch|dash)(?:es)?"
@@ -31,6 +32,9 @@ _PINCH_RE = re.compile(r"^(?:an?\s+)?(?:(small|large|generous|big|hefty)\s+)?(pi
 
 # "A 2-inch / 5-cm piece fresh turmeric": one piece of that size.
 _ARTICLE_COUNT_RE = re.compile(r"^an?\s+(?=\d)", re.IGNORECASE)
+# "½-inch piece fresh ginger": a size with no count, read as one piece
+# ("1 (½-inch) piece fresh ginger"), so it scales to "2 (½-inch) ...".
+_SIZE_FIRST_RE = re.compile(rf"^([\d{FRACTION_CHARS}]+-inch)\s+(?=pieces?\b)", re.IGNORECASE)
 
 _FOOTNOTE_MARKS_RE = re.compile(r"\s*[①-⑳]+")
 
@@ -106,6 +110,12 @@ def parse_fallback(line, parse):
     if m:
         number = _NUMBER_WORDS.get(m.group(1).lower(), "1") if m.groups() else "1"
         parsed = parse(f"{number} {line[m.end():].lstrip()}")
+        if parsed:
+            return {**parsed, "raw": line}
+
+    m = _SIZE_FIRST_RE.match(line)
+    if m:
+        parsed = parse(f"1 ({m.group(1)}) {line[m.end():]}")
         if parsed:
             return {**parsed, "raw": line}
 
