@@ -16,26 +16,44 @@ used by all three main scripts:
                                      sizes (scale ONE of them), or None
     SKIP_RE                          scale: lines to ignore in the list, or None
 
+find_recipe_starts gets layout too: the extracted line records parallel
+to lines (font size, bold, position, see ingest_utils/extract.py), for a
+book whose titles are told by type size. Optional:
+
+    find_section_starts(lines, layout, consumed)
+                                     ingest: where non-recipe sections
+                                     begin, instead of the shared ALL-CAPS
+                                     rule in ingest_utils/chunking.py
+    ingredient_end(lines, start)     scale: where the ingredient list ends,
+                                     for a book whose STEP_RE can't tell
+    is_continuation(pending, last_line, line)
+                                     scale: more ways a line can be the wrap
+                                     of the ingredient line before it
+                                     (pending, joined so far; last_line, its
+                                     last line as printed)
+
 Adding a book: write a module with those names, then add it to both
 tables below.
 """
 
-from books import book_on_pie, dessert_person
+from books import book_on_pie, bravetart, dessert_person
 
 # Lowercased, stripped book title -> strategy name. The title is the one
-# used in ingest.BOOKS and stored on every chunk. A book missing from here
+# in common/config.BOOK_FILES and stored on every chunk. A book missing from here
 # gets generic page-based chunking at ingest, and its chunks are tagged
 # content_type="unknown", so query-time recipe matching never looks at
 # them anyway.
 RECIPE_AWARE_BOOKS = {
     "the book on pie": "book_on_pie",
     "dessert person": "dessert_person",
+    "bravetart": "bravetart",
 }
 
 # Strategy name -> the module holding that format's rules.
 PROFILES = {
     "book_on_pie": book_on_pie,
     "dessert_person": dessert_person,
+    "bravetart": bravetart,
 }
 
 

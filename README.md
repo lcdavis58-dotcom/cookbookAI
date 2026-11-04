@@ -5,6 +5,7 @@ A local, private assistant for your own cookbooks. It reads cookbook PDFs into a
 Currently supported books (each has its own format rules in `books/`):
 - *The Book On Pie*
 - *Dessert Person*
+- *BraveTart*
 
 ## What it does
 
@@ -44,16 +45,19 @@ Expected layout:
 CookbookAI/
 ├── app/          <- this repository
 ├── chroma_db/    <- created by ingest.py
+├── extracted/    <- saved PDF extractions, created by ingest.py
 └── cookbooks/    <- your PDFs (not included)
 ```
 
-PDF paths are set in `BOOKS` in `ingest.py`. Then:
+Book titles and PDF filenames are in `BOOK_FILES` in `common/config.py`, and the books to ingest in `INGEST_BOOKS` in `ingest.py`. To keep the PDFs or the extractions somewhere else, set the `COOKBOOKS_DIR` or `EXTRACT_DIR` environment variable. Then:
 
 ```
-python3 ingest.py               # build the database
-python3 tools/clear_chroma.py   # wipe it before a full re-ingest
+python3 ingest.py               # build or update the database
 python3 tools/build_recipe_index.py   # rebuild only the recipe index, no re-ingest
+python3 tools/clear_chroma.py   # wipe the database and index
 ```
+
+Ingest runs in stages: extract (PDF to lines with layout, saved and reused until the PDF changes), structure (lines to recipe chunks), embed (only chunks whose text changed), index. Re-running it after a parsing change only embeds what changed, and replaces each book's old chunks.
 
 Run every script from `app/`.
 
@@ -65,7 +69,7 @@ Run every script from `app/`.
 
 | Path | Purpose |
 |---|---|
-| `ingest.py`, `ingest_utils/` | PDF → text → recipe-aware chunks → Chroma |
+| `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title matching |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest), matching |
@@ -77,11 +81,10 @@ Run every script from `app/`.
 
 ## Adding a book
 
-Add a module to `books/` that implements that book's recipe-start detection, title extraction and ingredient-line parsing (the existing two are good templates). Register it in `books/__init__.py`, then add its PDF to `BOOKS` in `ingest.py`.
+Add a module to `books/` that implements that book's recipe-start detection, title extraction and ingredient-line parsing (the existing two are good templates). Register it in `books/__init__.py`, then add its title to `INGEST_BOOKS` in `ingest.py` (and to `BOOK_FILES` in `common/config.py` if it isn't there). `tools/diagnostics/book_report.py` sizes up a new book, and `structure_baseline.py` checks that a change didn't break the books already working.
 
 ## Roadmap
 
-- "What can I make?": find recipes from the ingredients you have on hand
 - Move from the Raspberry Pi to a GPU machine
 - A locally hosted web interface for household use
 

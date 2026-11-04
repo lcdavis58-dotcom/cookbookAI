@@ -19,12 +19,14 @@ LEADING_PHRASES = [re.compile(p) for p in RULES.get("leading_phrases", [])]
 EQUIVALENTS = RULES.get("equivalents", {})
 IGNORE = set(RULES.get("ignore", []))
 PLURAL_EXCEPTIONS = RULES.get("plural_exceptions", {})
+TRAILING_PHRASES = [re.compile(p) for p in RULES.get("trailing_phrases", [])]
+COMMA_DESCRIPTORS = set(RULES.get("comma_descriptors", []))
 
 # A trailing "for the pan" / "for serving" with no comma before it, e.g.
 # "Neutral oil for the pan". Marks the ingredient as not part of the
 # recipe proper.
 _FOR_USE_RE = re.compile(
-    r"\s+for\s+(?:the\s+\w+|serving|sprinkling|dusting|brushing|greasing|garnish|topping)\b.*$")
+    r"\s+for\s+(?:the\s+\w+|serving|sprinkling|dusting|brushing|greasing|garnish|topping|frying)\b.*$")
 _PAREN_RE = re.compile(r"\([^()]*\)?")
 # A pointer to another recipe in the book: "1 recipe Brioche Dough",
 # "Flaky All-Butter Pie Dough (this page)", "One 9-inch pie crust (see
@@ -38,14 +40,26 @@ _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|gar
 # A list at the start of a name that ends in "or"/"and": "gruyère,
 # manchego, or parmesan", "honey, olive oil, and a lemon wedge".
 _COMMA_LIST_RE = re.compile(r"^([^,]+(?:,\s*[^,]+?)+),\s*(or|and/or|and)\s+([^,]+)")
+# A prep note among those commas ("vanilla bean, halved lengthwise,
+# seeds scraped out, or 2 teaspoons vanilla extract") means they aren't
+# a list of ingredients.
+_PREP_WORD_RE = re.compile(r"\b(?:[a-z]+ed|cut|torn|split)\b")
+# "Oil for frying, see page 189" points at a technique, not a recipe.
+_SEE_PAGE_RE = re.compile(r",?\s*see page\s+\d+")
+# "Golden syrup, such as Lyle's, or light corn syrup": a brand aside,
+# which would otherwise read as one item of a list.
+_SUCH_AS_RE = re.compile(r",?\s+such as\b.*$")
 
 # "X or Y", "X and/or Y" inside a normalized name.
 _ALTERNATIVE_SPLIT_RE = re.compile(r"\s+(?:and/)?or\s+")
 # An amount left in front of an alternative: "lemon juice or 1 g / ¼
-# teaspoon citric acid", "black tea or 1 teaspoon instant espresso".
+# teaspoon citric acid", "black tea or 1 teaspoon instant espresso",
+# "whole cherries or 5 cups | 28 ounces frozen cherries".
+_AMOUNT_CHARS = r"[\d.¼½¾⅓⅔⅛]+"
+_AMOUNT_UNITS = r"(?:g|ml|cups?|tablespoons?|teaspoons?|ounces?|pounds?)\b"
 _ALTERNATIVE_AMOUNT_RE = re.compile(
-    r"^[\d.¼½¾⅓⅔⅛]+\s*(?:g|ml)?\s*(?:/\s*[\d.¼½¾⅓⅔⅛]+\s*)?"
-    r"(?:cups?|tablespoons?|teaspoons?|ounces?|pounds?)?\s+")
+    rf"^{_AMOUNT_CHARS}\s*(?:{_AMOUNT_UNITS})?\s*"
+    rf"(?:[/|]\s*{_AMOUNT_CHARS}\s*(?:{_AMOUNT_UNITS})?\s*)?(?=\S)")
 
 
 def singular(word):
@@ -62,6 +76,20 @@ def singular(word):
     return word
 
 
+def _join_list(m):
+    """A _COMMA_LIST_RE match as one "X or Y or Z" name, unless the items
+    after the first are prep notes ("vanilla bean, halved lengthwise,
+    ..."): then it's left alone, and the cut at the first comma keeps
+    just the ingredient. A prep word in the first item is a list of ways
+    to cut one thing ("chopped, torn, or small whole basil leaves"), so
+    that still joins."""
+    items, joiner = m.group(1), m.group(2)
+    first, rest = items.split(",", 1)
+    if _PREP_WORD_RE.search(rest) and not _PREP_WORD_RE.search(first):
+        return m.group(0)
+    return re.sub(r",\s*", f" {joiner} ", items) + f" {joiner} {m.group(3)}"
+
+
 def normalize(name):
     """Parsed ingredient name -> (normalized name, flags). Flags are any of
     "optional" (garnish, pan grease, explicitly optional), "sub_recipe"
@@ -69,7 +97,7 @@ def normalize(name):
     "alternative" (an "X or Y" choice) and "ignored" (on the ignore
     list)."""
     flags = set()
-    text = name.lower().strip()
+    text = _SEE_PAGE_RE.sub("", name.lower().strip())
     # "butter, at room temperature, plus more for the pan" still needs the
     # butter, only the "plus more" part is pan prep, so look for optional
     # wording before any "plus" clause.
@@ -78,14 +106,18 @@ def normalize(name):
     if _SUB_RECIPE_RE.search(text):
         flags.add("sub_recipe")
 
-    text = _PAREN_RE.sub(" ", text)
+    text = _SUCH_AS_RE.sub("", _PAREN_RE.sub(" ", text)).strip()
+    # "cold, unsalted butter" is unsalted butter.
+    while (m := re.match(r"([\w-]+),\s*", text)) and m.group(1) in COMMA_DESCRIPTORS:
+        text = text[m.end():]
     # "gruyère, manchego, or parmesan" is one choice, and "flaky salt,
     # pepper, and lemon" one list, so join those commas before cutting
     # the prep notes off at the first remaining one.
-    text = _COMMA_LIST_RE.sub(lambda m: re.sub(r",\s*", f" {m.group(2)} ", m.group(1))
-                              + f" {m.group(2)} {m.group(3)}", text, count=1)
+    text = _COMMA_LIST_RE.sub(_join_list, text, count=1)
     text = text.split(",", 1)[0]
     text = _FOR_USE_RE.sub("", text)
+    for phrase in TRAILING_PHRASES:
+        text = phrase.sub("", text)
     text = re.sub(r"\s+", " ", text).strip(" .;:-")
 
     # Phrases and words alternate until neither removes anything, since a

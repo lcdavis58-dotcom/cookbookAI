@@ -100,7 +100,7 @@ def split_on_lines(text, max_chars):
     return parts
 
 
-def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=3000):
+def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=3000, layout=None):
     """Split the book into (text, content_type, page_num, confirmed,
     extra_metadata) chunks. Recipe boundaries (title through its
     variations) come from the book's own find_recipe_starts (profile is
@@ -119,9 +119,17 @@ def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=
 
     Oversized "other" segments still use the overlapping sliding window,
     those are only ever retrieved piecemeal, never reassembled.
+
+    layout, the extracted line records parallel to lines (see
+    ingest_utils/extract.py), is passed on to the book's
+    find_recipe_starts, and to its own find_section_starts if it has one
+    (a book that can tell its headings by type size).
     """
-    recipe_starts, consumed = profile.find_recipe_starts(lines)
-    section_starts = find_section_starts(lines, consumed, book_title, profile)
+    recipe_starts, consumed = profile.find_recipe_starts(lines, layout)
+    if hasattr(profile, "find_section_starts"):
+        section_starts = profile.find_section_starts(lines, layout, consumed)
+    else:
+        section_starts = find_section_starts(lines, consumed, book_title, profile)
 
     boundary_types = {i: "recipe" for i in recipe_starts}
     boundary_types.update({i: "other" for i in section_starts})

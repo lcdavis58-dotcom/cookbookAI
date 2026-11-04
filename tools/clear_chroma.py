@@ -5,10 +5,11 @@ Run from app/ (either form works):
     python3 tools/clear_chroma.py
     python3 -m tools.clear_chroma
 
-Needed because ingest.py upserts chunks by id ("<book>-c<N>"), so a
-re-ingest that produces fewer chunks than the last one leaves the extra
-old chunks behind. Wiping everything means every book has to be
-re-ingested afterward, not just the one you were fixing.
+Rarely needed: ingest.py replaces a book's chunks on every run, so
+re-ingesting a book never leaves old ones behind. Use this to drop a
+book that's no longer ingested, or to start over. Every book has to be
+re-ingested afterward, and the saved extractions (EXTRACT_DIR) are kept,
+so that's only the embedding time.
 """
 
 import os

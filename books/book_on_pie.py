@@ -38,9 +38,10 @@ DIFFICULTY_RE = re.compile(r"DIFFICULTY", re.IGNORECASE)
 DIFFICULTY_WORD_RE = re.compile(r"^[A-Z]{2,15}$")
 
 
-def find_recipe_starts(lines):
+def find_recipe_starts(lines, layout=None):
     """Return (start_line_indices, consumed_line_indices) for every
-    detected recipe title. consumed_line_indices covers every line that's
+    detected recipe title (the text alone is enough, layout is unused).
+    consumed_line_indices covers every line that's
     part of a title block, its MAKES/DIFFICULTY line(s), and a possible
     wrapped difficulty rating, this is used downstream to stop the
     section-header detector from getting confused by any of those, which

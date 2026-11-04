@@ -19,9 +19,9 @@ Format, for reference:
 """
 
 import re
-from fractions import Fraction
 
-from common.text_parsing import FRACTION_CHARS, parse_amount
+from common.text_parsing import (AMOUNT, UNIT_TSP, canonical_volume_unit,
+                                 parse_typed_amount, volume_to_tsp)
 
 # ---------------------------------------------------------------------------
 # Recipe-boundary detection (ingest)
@@ -48,9 +48,10 @@ def _paren_balance(text):
     return text.count("(") - text.count(")")
 
 
-def find_recipe_starts(lines):
+def find_recipe_starts(lines, layout=None):
     """Return (start_line_indices, consumed_line_indices) for every recipe
-    title in Dessert Person. consumed covers the title line(s) plus the
+    title in Dessert Person (the text alone is enough, layout is unused).
+    consumed covers the title line(s) plus the
     full Season/Difficulty metadata block so that find_section_starts does
     not mistake any part of them for a standalone section header.
     """
@@ -144,72 +145,20 @@ _FOOTNOTE_RE = re.compile(r"[①-⑳]")
 # "(7 oz / 200g)", "(1½ oz / 43g)", or grams alone "(200g)". The ounce
 # half is skipped over rather than parsed, the gram figure is what we keep.
 _METRIC_PAREN_RE = re.compile(r"\(\s*(?:[^()]*?oz\s*/\s*)?([\d.,]+)\s*g\s*\)")
-# An amount can be a plain or decimal number, a unicode fraction (with or
-# without a whole number glued on, "1⅓"), or a typed fraction ("1/3",
-# "1 1/2"). PDFs often encode typed fractions with U+2044 FRACTION SLASH
-# rather than "/", so both count.
-_NUM = (
-    rf"(?:\d+\s+\d+[/⁄]\d+|\d+[/⁄]\d+|\d*[{FRACTION_CHARS}]|\d+(?:\.\d+)?)"
-)
+# AMOUNT (common.text_parsing) covers "1", "1.5", "1⅓" and "1 1/2".
 _UNIT = r"(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|sticks?)"
-_SINGLE_RE = re.compile(rf"^({_NUM})\s*({_UNIT})\s+", re.IGNORECASE)
+_SINGLE_RE = re.compile(rf"^({AMOUNT})\s*({_UNIT})\s+", re.IGNORECASE)
 _COMPOUND_RE = re.compile(
-    rf"^({_NUM})\s*({_UNIT})\s+plus\s+({_NUM})\s*({_UNIT})\s+", re.IGNORECASE
+    rf"^({AMOUNT})\s*({_UNIT})\s+plus\s+({AMOUNT})\s*({_UNIT})\s+", re.IGNORECASE
 )
 # A count, then the name, or a size in parentheses first: "2 (3-inch)
 # cinnamon sticks", "1 (750 ml) bottle dry rosé wine".
-_COUNT_RE = re.compile(rf"^({_NUM})\s+(?=[A-Za-z(])")
+_COUNT_RE = re.compile(rf"^({AMOUNT})\s+(?=[A-Za-z(])")
 _INSTRUCTION_RE = re.compile(r"^\d+\.\s")
-_TYPED_FRACTION_RE = re.compile(r"^(?:(\d+)\s+)?(\d+)[/⁄](\d+)$")
-
-_TSP_PER_TBSP = 3
-_TSP_PER_CUP = 48
-# A stick of butter is 8 tablespoons. It's a real unit here (not just a
-# word left in the ingredient name) so "1 stick plus 2 tablespoons" sums
-# correctly and the display can say "2 sticks" instead of a bare "2".
-_TSP_PER_STICK = 8 * _TSP_PER_TBSP
-_UNIT_TSP = {"teaspoon": 1, "tablespoon": _TSP_PER_TBSP,
-             "stick": _TSP_PER_STICK, "cup": _TSP_PER_CUP}
 
 # This book has no alternative batch sizes, every label (CAKE, GLAZE,
 # MANGO CARAMEL SAUCE) is a component that always gets made.
 BATCH_LABEL_RE = None
-
-
-def _parse_amount(text):
-    """parse_amount() plus typed fractions ("1/3", "1 1/2"), which this
-    book uses but Book on Pie's unicode-only format never needed."""
-    m = _TYPED_FRACTION_RE.match(text.strip())
-    if m:
-        whole = int(m.group(1)) if m.group(1) else 0
-        denominator = int(m.group(3))
-        if denominator == 0:
-            return None
-        return whole + int(m.group(2)) / denominator
-    return parse_amount(text)
-
-
-def _canonical_unit(unit):
-    """Collapse "cups"/"Tablespoons"/"tsp"/"sticks" etc. to one of the
-    keys of _UNIT_TSP."""
-    unit = (unit or "").lower()
-    if "stick" in unit:
-        return "stick"
-    if "teaspoon" in unit or unit == "tsp":
-        return "teaspoon"
-    if "tablespoon" in unit or unit == "tbsp":
-        return "tablespoon"
-    if "cup" in unit:
-        return "cup"
-    return None
-
-
-def _to_tsp(amount, unit):
-    """Convert a volume amount to teaspoons using exact integer ratios."""
-    canonical = _canonical_unit(unit)
-    if canonical is None or amount is None:
-        return None
-    return Fraction(amount).limit_denominator(1000) * _UNIT_TSP[canonical]
 
 
 def parse_ingredient_line(line):
@@ -246,23 +195,23 @@ def parse_ingredient_line(line):
     compound = _COMPOUND_RE.match(line)
     if compound:
         amt1, unit1, amt2, unit2 = compound.groups()
-        tsp1 = _to_tsp(_parse_amount(amt1), unit1)
-        tsp2 = _to_tsp(_parse_amount(amt2), unit2)
+        tsp1 = volume_to_tsp(parse_typed_amount(amt1), unit1)
+        tsp2 = volume_to_tsp(parse_typed_amount(amt2), unit2)
         if tsp1 is None or tsp2 is None:
             return None
         imperial_unit = max(
-            (_canonical_unit(unit1), _canonical_unit(unit2)),
-            key=lambda u: _UNIT_TSP[u],
+            (canonical_volume_unit(unit1), canonical_volume_unit(unit2)),
+            key=lambda u: UNIT_TSP[u],
         )
-        imperial_amount = float((tsp1 + tsp2) / _UNIT_TSP[imperial_unit])
+        imperial_amount = float((tsp1 + tsp2) / UNIT_TSP[imperial_unit])
         imperial_display = line[:compound.end()].strip()
         name = line[compound.end():].strip()
     else:
         single = _SINGLE_RE.match(line)
         if single:
             amt, unit = single.groups()
-            imperial_amount = _parse_amount(amt)
-            imperial_unit = _canonical_unit(unit)
+            imperial_amount = parse_typed_amount(amt)
+            imperial_unit = canonical_volume_unit(unit)
             if imperial_amount is None:
                 return None
             name = line[single.end():].strip()
@@ -270,7 +219,7 @@ def parse_ingredient_line(line):
             fallback = _COUNT_RE.match(line)
             if not fallback:
                 return None
-            imperial_amount = _parse_amount(fallback.group(1))
+            imperial_amount = parse_typed_amount(fallback.group(1))
             if imperial_amount is None:
                 return None
             imperial_unit = None

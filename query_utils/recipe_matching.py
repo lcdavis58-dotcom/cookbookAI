@@ -29,13 +29,18 @@ def extract_title(text, book=None, include_subtitle=True):
 def display_title(title):
     """ALL-CAPS titles (Book on Pie) read better title-cased; titles that
     are already mixed case (Dessert Person) are left exactly as printed,
-    so "with Mango Caramel" doesn't become "With Mango Caramel"."""
-    return title.title() if title.isupper() else title
+    so "with Mango Caramel" doesn't become "With Mango Caramel".
+    str.title() starts a new word after an apostrophe ("Angel’S"), so
+    the letter after one is put back in lowercase."""
+    if not title.isupper():
+        return title
+    return re.sub(r"(?<=[’'])[A-Z]", lambda m: m.group(0).lower(), title.title())
 
 
 def extract_yield_line(text):
     """Pull out the recipe's stated yield text, used as context for
-    basis="yield" scaling requests. Grabs the MAKES (or SERVES) line plus
+    basis="yield" scaling requests. Grabs the MAKES (or SERVES, or
+    BraveTart's YIELD:) line plus
     up to two following lines and joins them, since this text sometimes
     wraps across lines (the same DIFFICULTY-line-wrap quirk ingest works
     around during chunking). Returns "" if neither is found, the model is
@@ -43,7 +48,7 @@ def extract_yield_line(text):
     """
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if line.strip().upper().startswith(("MAKES", "SERVES")):
+        if line.strip().upper().startswith(("MAKES", "SERVES", "YIELD:")):
             block = lines[i:i + 3]
             return " ".join(l.strip() for l in block if l.strip())
     return ""

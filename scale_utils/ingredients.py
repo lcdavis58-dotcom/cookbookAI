@@ -145,6 +145,7 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
     describing = None
     skipped_text = None
     pending = None
+    last_line = None  # the last line added to pending, as printed
 
     def flush():
         nonlocal pending
@@ -158,10 +159,19 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
 
     lines = chunk_text.splitlines()
     start = book.ingredient_start(lines)
+    # A book whose steps can't be told from a line alone says where its
+    # list ends instead (BraveTart's "Make the dough:" looks just like
+    # its "Cookies:" label).
+    end = book.ingredient_end(lines, start) if hasattr(book, "ingredient_end") else len(lines)
     for line in lines[:start]:
         trace("before start", line)
     for i in range(start, len(lines)):
         stripped = lines[i].strip()
+        if i >= end:
+            flush()
+            if stripped:
+                trace("after list ended", stripped)
+            continue
         if not stripped:
             flush()
             continue
@@ -213,12 +223,15 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
             trace("after list ended", stripped)
             continue
 
-        if pending is not None and _is_wrapped_continuation(pending, stripped):
+        if pending is not None and (_is_wrapped_continuation(pending, stripped)
+                                    or (hasattr(book, "is_continuation")
+                                        and book.is_continuation(pending, last_line, stripped))):
             pending = f"{pending} {stripped}"
             trace("joined to line above", stripped)
         else:
             flush()
             pending = stripped
+        last_line = stripped
     flush()
 
     for name in [name for name, ings in groups.items() if not ings]:

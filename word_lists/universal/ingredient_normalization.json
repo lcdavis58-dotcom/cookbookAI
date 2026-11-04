@@ -33,7 +33,24 @@
     "^[\\d.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
     "^fresh\\s+or\\s+frozen\\s+",
     "^[\\d½¼¾]+-inch\\s*(?:/\\s*[\\d.]+-cm\\s*)?(?:pieces?\\s+)?",
-    "^firm\\s+ripe\\s+"
+    "^firm\\s+ripe\\s+",
+    "^of\\s+",
+    "^[\\d½¼¾]+-ounce\\s+"
+  ],
+
+  "_trailing_phrases": "Regular expressions removed from the END of a name, after the prep notes past the first comma are cut: what the ingredient is for or where it came from, when the book didn't put a comma before it ('milk to bloom the gelatin', 'egg whites straight from the fridge', 'flour such as Gold Medal').",
+  "trailing_phrases": [
+    "\\s+to\\s+[a-z]+\\s+the\\b.*$",
+    "\\s+if\\s+needed$",
+    "\\s+straight\\s+from\\s+the\\s+fridge$",
+    "\\s+from\\s+about\\s+\\d.*$",
+    "\\s+such\\s+as\\b.*$"
+  ],
+
+  "_comma_descriptors": "Words that describe an ingredient when printed alone before a comma, BraveTart style: 'cold, unsalted butter', 'whole, ripe strawberries', 'plump, moist, dried apples'. The word and its comma are dropped, so the cut at the first comma doesn't leave just 'cold'. Only words that are never the ingredient itself belong here.",
+  "comma_descriptors": [
+    "whole", "plump", "moist", "sticky", "unsweetened", "cold", "medium", "large",
+    "small", "ripe", "unpeeled", "soft", "firm", "fresh"
   ],
 
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
@@ -46,7 +63,11 @@
     "garlic clove": "garlic",
     "pink lady apple": "sweet-tart apple",
     "pink lady or any sweet-tart": "sweet-tart apple",
-    "hard-boiled egg yolk": "egg yolk"
+    "hard-boiled egg yolk": "egg yolk",
+    "white sugar": "granulated sugar",
+    "all purpose flour": "all-purpose flour",
+    "dutch cocoa powder": "dutch-process cocoa powder",
+    "cool tap water": "water"
   },
 
   "_ignore": "Normalized names left out entirely: placeholders nobody would list as something they have.",

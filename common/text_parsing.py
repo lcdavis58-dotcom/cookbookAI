@@ -1,10 +1,12 @@
 """
 Small text-parsing building blocks used across books and scripts: unicode
 fraction amounts, the ALL-CAPS line shape cookbooks use for titles and
-section headers, and telling a component label from a new section.
+section headers, telling a component label from a new section, and US
+volume units.
 """
 
 import re
+from fractions import Fraction
 
 FRACTIONS = {
     "¼": 0.25, "½": 0.5, "¾": 0.75,
@@ -80,3 +82,64 @@ def parse_amount(text):
         return float(text)
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Typed fractions and US volume units, for books that print "1/3 cup" or
+# "1 cup plus 2 tablespoons" (Dessert Person, BraveTart)
+# ---------------------------------------------------------------------------
+
+# An amount can be a plain or decimal number, a unicode fraction (with or
+# without a whole number glued on, "1⅓"), or a typed fraction ("1/3",
+# "1 1/2"). PDFs often encode typed fractions with U+2044 FRACTION SLASH
+# rather than "/", so both count.
+AMOUNT = (
+    rf"(?:\d+\s+\d+[/⁄]\d+|\d+[/⁄]\d+|\d*[{FRACTION_CHARS}]|\d+(?:\.\d+)?)"
+)
+_TYPED_FRACTION_RE = re.compile(r"^(?:(\d+)\s+)?(\d+)[/⁄](\d+)$")
+
+TSP_PER_TBSP = 3
+TSP_PER_CUP = 48
+# A stick of butter is 8 tablespoons. It's a real unit here (not just a
+# word left in the ingredient name) so "1 stick plus 2 tablespoons" sums
+# correctly and the display can say "2 sticks" instead of a bare "2".
+TSP_PER_STICK = 8 * TSP_PER_TBSP
+UNIT_TSP = {"teaspoon": 1, "tablespoon": TSP_PER_TBSP,
+            "stick": TSP_PER_STICK, "cup": TSP_PER_CUP}
+
+
+def parse_typed_amount(text):
+    """parse_amount() plus typed fractions ("1/3", "1 1/2"), which
+    Dessert Person and BraveTart use but Book on Pie's unicode-only
+    format never needed."""
+    m = _TYPED_FRACTION_RE.match(text.strip())
+    if m:
+        whole = int(m.group(1)) if m.group(1) else 0
+        denominator = int(m.group(3))
+        if denominator == 0:
+            return None
+        return whole + int(m.group(2)) / denominator
+    return parse_amount(text)
+
+
+def canonical_volume_unit(unit):
+    """Collapse "cups"/"Tablespoons"/"tsp"/"sticks" etc. to one of the
+    keys of UNIT_TSP."""
+    unit = (unit or "").lower()
+    if "stick" in unit:
+        return "stick"
+    if "teaspoon" in unit or unit == "tsp":
+        return "teaspoon"
+    if "tablespoon" in unit or unit == "tbsp":
+        return "tablespoon"
+    if "cup" in unit:
+        return "cup"
+    return None
+
+
+def volume_to_tsp(amount, unit):
+    """Convert a volume amount to teaspoons using exact integer ratios."""
+    canonical = canonical_volume_unit(unit)
+    if canonical is None or amount is None:
+        return None
+    return Fraction(amount).limit_denominator(1000) * UNIT_TSP[canonical]
