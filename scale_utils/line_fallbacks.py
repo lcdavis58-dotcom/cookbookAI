@@ -7,6 +7,7 @@ with a plain amount:
     Pinch of fine sea salt                            pinch / dash as the amount
     One 2-inch / 5-cm piece fresh turmeric            amount spelled out
     Grated zest of 1 lime                             part of a counted ingredient
+    Egg wash: 57 g / 1 large egg, beaten with ...     a name, then a normal line
     Butter for the pan                                no amount at all
 
 parse_fallback tries them in that order. Each result has the same shape
@@ -32,6 +33,11 @@ _PINCH_RE = re.compile(r"^(?:an?\s+)?(?:(small|large|generous|big|hefty)\s+)?(pi
 _ARTICLE_COUNT_RE = re.compile(r"^an?\s+(?=\d)", re.IGNORECASE)
 
 _FOOTNOTE_MARKS_RE = re.compile(r"\s*[①-⑳]+")
+
+# "Egg wash: 57 g / 1 large egg, beaten with 15 g / 1 tablespoon water":
+# what it makes, then its main ingredient's amount. Read as that many of
+# the named thing ("Egg wash"), the rest kept in raw.
+_NAMED_AMOUNT_RE = re.compile(rf"^(?P<label>[A-Z][A-Za-z’' -]{{1,30}}):\s+(?=[\d{FRACTION_CHARS}])")
 
 _NUMBER_WORDS = {
     "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
@@ -102,6 +108,12 @@ def parse_fallback(line, parse):
         parsed = parse(f"{number} {line[m.end():].lstrip()}")
         if parsed:
             return {**parsed, "raw": line}
+
+    m = _NAMED_AMOUNT_RE.match(line)
+    if m:
+        parsed = parse(line[m.end():])
+        if parsed:
+            return {**parsed, "raw": line, "name": m.group("label")}
 
     m = _PART_OF_RE.match(line)
     if m:

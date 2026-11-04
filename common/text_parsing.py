@@ -15,10 +15,11 @@ FRACTIONS = {
 }
 FRACTION_CHARS = "".join(FRACTIONS.keys())
 
-# A short ALL-CAPS line (letters, digits, spaces, and a small set of
-# punctuation): Book on Pie's recipe titles, and standalone section
-# headers like 'PIE PEP TALK' in any book.
-ALLCAPS_LINE_RE = re.compile(r"^[A-Z0-9][A-Z0-9 ,\-'/’]{1,59}$")
+# A short ALL-CAPS line (letters, accented ones included, digits, spaces,
+# and a small set of punctuation): component labels like "FILLING",
+# "CRÈME BRÛLÉE" or "TOPPING (OPTIONAL)", and asides like "PIE PEP TALK".
+_CAPS = "A-Z0-9À-ÖØ-Þ"
+ALLCAPS_LINE_RE = re.compile(rf"^[{_CAPS}][{_CAPS} ,\-'/’&();]{{1,59}}$")
 
 # How many non-blank lines after a heading to look at for an ingredient.
 # More than one, since a component often opens with a line no parser can

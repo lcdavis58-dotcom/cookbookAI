@@ -2,10 +2,11 @@
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes and scale them up or down. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service.
 
-Currently supported books (each has its own format rules in `books/`):
+Currently supported books (each has its own settings in `books/`):
 - *The Book On Pie*
 - *Dessert Person*
 - *BraveTart*
+- *The Fearless Baker*
 
 ## What it does
 
@@ -73,7 +74,7 @@ Run every script from `app/`.
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title matching |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest), matching |
-| `books/` | Per-book format rules (recipe boundaries, titles, ingredient lines) |
+| `books/` | Per-book settings, the shared engine that applies them, and ingredient line styles |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
 | `tools/` | Maintenance scripts; `tools/diagnostics/` for seeing how ingest and the parsers read a book |
@@ -81,7 +82,9 @@ Run every script from `app/`.
 
 ## Adding a book
 
-Add a module to `books/` that implements that book's recipe-start detection, title extraction and ingredient-line parsing (the existing two are good templates). Register it in `books/__init__.py`, then add its title to `INGEST_BOOKS` in `ingest.py` (and to `BOOK_FILES` in `common/config.py` if it isn't there). `tools/diagnostics/book_report.py` sizes up a new book, and `structure_baseline.py` checks that a change didn't break the books already working.
+Most books need only settings. Run `tools/diagnostics/book_report.py "<title>" --anchor "<yield line regex>"` to see the type size of the lines just above each yield line ("Makes ...", "YIELD: ..."), then write a `books/` module giving `TITLE_MIN_SIZE`, `YIELD_RE` and `INGREDIENT_STYLE` (one of the styles in `books/line_styles.py`), plus any of the other settings listed in `books/__init__.py` that the book needs. `books/fearless_baker.py` is a complete example. The shared engine (`books/engine.py`) does the rest; a module defines a function of its own only for something truly specific to the book (BraveTart's ingredient list end, for one).
+
+Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS` in `ingest.py` (and to `BOOK_FILES` in `common/config.py` if it isn't there). Re-run `book_report.py` to check its recipes, groups and rejected lines, and `tools/diagnostics/structure_baseline.py compare` to check that a change didn't break the books already working.
 
 ## Roadmap
 

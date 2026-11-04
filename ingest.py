@@ -49,6 +49,7 @@ INGEST_BOOKS = [
     "The Book On Pie",
     "Dessert Person",
     "BraveTart",
+    "The Fearless Baker",
 ]
 
 
