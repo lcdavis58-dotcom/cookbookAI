@@ -108,7 +108,9 @@ def find_recipe_header_matches(hits, question):
     matches = []
     seen_titles = set()
     for h in hits:
-        if h["content_type"] != "recipe":
+        # Only a recipe's first part starts with its title; a later part's
+        # first line is just wherever the split fell.
+        if h["content_type"] != "recipe" or h.get("part", 0) != 0:
             continue
         title = extract_title(h["text"], h["book"])
         if not title or title in seen_titles:

@@ -22,6 +22,7 @@ from scale_utils.line_fallbacks import parse_fallback
 # one starts, nothing after it belongs in the scaled list: a variation's
 # ingredients are an alternative, not an addition, and a variation can
 # carry its own component labels that would otherwise restart the list.
+# A book can name more of its own (ASIDE_RE, Book on Pie's "PIE-DEAS").
 ASIDE_LABEL_RE = re.compile(r"^(?:DO AHEAD|NOTES?|TIPS?|VARIATIONS?)(?:\s+\d+)?$")
 
 # A batch label's one-line description right under it, e.g. "(for
@@ -185,7 +186,8 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
                 continue
             skipped_text = None
         heading = heading_text(stripped)
-        if heading and ASIDE_LABEL_RE.match(heading):
+        if heading and (ASIDE_LABEL_RE.match(heading)
+                        or (book.ASIDE_RE is not None and book.ASIDE_RE.match(heading))):
             flush()
             in_aside = True
             trace("aside (ends list)", stripped)

@@ -1,6 +1,7 @@
 """
-Save what ingest makes of each recipe-aware book (recipe titles, pages,
-ingredients, groups, chunk counts), then check later changes against it.
+Save what ingest makes of each book (chunk counts and a fingerprint of
+every chunk's text, plus recipe titles, pages, ingredients and groups for
+books with a profile), then check later changes against it.
 Runs the whole structure step without embedding or touching Chroma, so
 it takes seconds and works anywhere the PDFs are.
 
@@ -8,7 +9,8 @@ Run from app/ (either form works):
     python3 tools/diagnostics/structure_baseline.py save [BOOK_TITLE ...]
     python3 tools/diagnostics/structure_baseline.py compare [BOOK_TITLE ...]
 
-With no titles it covers every book that has a profile in books/. The
+With no titles it covers all 16 books, so a change to the shared rules
+shows up in books without a profile too (as changed chunk text). The
 baseline and the full diff quote the books, so both go in
 testing/one_off/baseline/ (git-ignored). compare prints a short summary
 per book; the details are in <book>_diff.txt next to the baseline.
@@ -24,7 +26,6 @@ from collections import Counter, defaultdict
 # import path so the shared modules can be found.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from books import RECIPE_AWARE_BOOKS  # noqa: E402
 from common.config import BOOK_FILES, PROJECT_ROOT, book_pdf_path  # noqa: E402
 from ingest_utils.pdf_text import build_line_stream  # noqa: E402
 from ingest_utils.structure import structure_book  # noqa: E402
@@ -70,11 +71,17 @@ def snapshot(book_title):
             "your_choice": entry["your_choice"],
             "groups": entry["groups"],
         })
+    # One fingerprint per content type over every chunk's text, in order,
+    # so a book with no profile (all "unknown" chunks) is still checked.
+    by_type = defaultdict(hashlib.sha1)
+    for text, content_type, _, _, _ in records:
+        by_type[content_type].update(text.encode("utf-8") + b"\0")
     return {
         "book": book_title,
         "lines": len(build_line_stream(pdf_path)[0]),
         "pages": page_count,
         "chunks": Counter(rec[1] for rec in records),
+        "chunk_hashes": {t: h.hexdigest()[:12] for t, h in sorted(by_type.items())},
         "recipes": out,
     }
 
@@ -99,12 +106,18 @@ def compare(old, new):
             summary.append(f"{field}: {old[field]} -> {new[field]}")
     if dict(old["chunks"]) != dict(new["chunks"]):
         summary.append(f"chunks: {dict(old['chunks'])} -> {dict(new['chunks'])}")
+    old_h, new_h = old.get("chunk_hashes"), new["chunk_hashes"]
+    if old_h is not None:
+        changed_types = sorted(t for t in old_h.keys() | new_h.keys() if old_h.get(t) != new_h.get(t))
+        if changed_types:
+            summary.append("chunk text changed: " + ", ".join(changed_types))
 
     old_k, new_k = keyed(old["recipes"]), keyed(new["recipes"])
     gone = [k for k in old_k if k not in new_k]
     added = [k for k in new_k if k not in old_k]
-    summary.append(f"recipes: {len(old_k)} -> {len(new_k)} "
-                   f"({len(gone)} gone, {len(added)} new)")
+    if gone or added:
+        summary.append(f"recipes: {len(old_k)} -> {len(new_k)} "
+                       f"({len(gone)} gone, {len(added)} new)")
     for k in gone:
         detail.append(f"GONE  p{k[1]}  {k[0]}  ({len(old_k[k]['ingredients'])} ingredients)")
     for k in added:
@@ -131,8 +144,8 @@ def compare(old, new):
             detail.extend(f"    {note}" for note in notes)
     if changed:
         summary.append("changed recipes: " + ", ".join(f"{v} {f}" for f, v in sorted(changed.items())))
-    else:
-        summary.append("no changes in matching recipes")
+    elif not summary:
+        summary.append(f"no changes ({len(new_k)} recipes)" if new_k else "no changes")
     return summary, detail
 
 
@@ -141,7 +154,7 @@ def main(argv):
         sys.exit(__doc__)
     action, titles = argv[0], argv[1:]
     if not titles:
-        titles = [t for t in BOOK_FILES if t.lower() in RECIPE_AWARE_BOOKS]
+        titles = list(BOOK_FILES)
     os.makedirs(BASELINE_DIR, exist_ok=True)
 
     for title in titles:

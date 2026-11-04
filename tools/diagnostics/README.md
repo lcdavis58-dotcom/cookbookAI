@@ -7,7 +7,7 @@ Their output quotes the books, so save it under `testing/one_off/` (git-ignored)
 | Script | What it shows | Needs |
 |---|---|---|
 | `book_report.py "Book Title" [--anchor REGEX]` | A scorecard: font sizes with samples, text problems (glyphs, spaced letters), and for a book with a profile, recipe count, odd titles, empty recipes, rejected lines, group kinds | the PDF |
-| `structure_baseline.py save` or `compare [titles]` | Saves what ingest makes of each working book (titles, pages, ingredients, groups), then reports what a change altered | the PDF |
+| `structure_baseline.py save` or `compare [titles]` | Saves what ingest makes of every book (chunk text fingerprints; titles, pages, ingredients and groups for books with a profile), then reports what a change altered | the PDF |
 | `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF | the PDF |
 | `dump_blocks.py "Book Title" "text"` | Every page containing the text, line by line, with block, position, font size, bold/italic and the gap above | the PDF |
 | `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps | the database |

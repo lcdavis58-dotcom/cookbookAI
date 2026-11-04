@@ -4,8 +4,6 @@ asks the book's own module (books/) where recipes start; everything
 else here is shared by every book.
 """
 
-from common.text_parsing import ALLCAPS_LINE_RE, is_component_label
-from common.word_list_loader import load_book_specific
 from ingest_utils.pdf_text import page_for_line
 
 # Roughly how many characters per chunk, with overlap so a recipe split
@@ -28,51 +26,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
         chunks.append(text[start:end])
         start = end - overlap
     return chunks
-
-
-# Default fallback if a book has no word_lists/books/<slug>/ entry of its
-# own, harmless for a book with no batch-style subsections at all, since
-# an unmatched label here just means find_section_starts() never has
-# anything to exclude.
-_DEFAULT_SUBSECTION_LABELS = [
-    "half batch", "full batch", "mile-high batch", "variation",
-    "variations", "note", "notes", "tip", "tips",
-]
-
-
-def find_section_starts(lines, consumed, book_title, profile):
-    """Detect standalone non-recipe section headers, like 'PIE PEP TALK' or
-    'GLAZES': a short ALL-CAPS line that isn't part of any recipe's title
-    block and isn't inside a recipe. These get their own 'other'-tagged
-    chunk boundary instead of silently being absorbed into whichever
-    recipe happens to come right after them.
-
-    Two kinds of ALL-CAPS line inside a recipe are not section starts:
-      - component labels ("FILLING", "MANGO CARAMEL SAUCE"), recognized by
-        an ingredient following within a few lines (is_component_label,
-        using the book's own parser, profile). Splitting at these used to
-        leave a recipe's whole ingredient list in a separate untitled
-        chunk.
-      - asides followed by prose ("NOTES", "VARIATIONS", "DO AHEAD"),
-        which can't be told apart by what follows, so they're listed per
-        book in word_lists/books/<slug>/recipe_subsection_labels.json.
-    """
-    labels = set(
-        label.upper() for label in
-        load_book_specific(book_title, "recipe_subsection_labels.json",
-                            {"labels": _DEFAULT_SUBSECTION_LABELS}).get("labels", _DEFAULT_SUBSECTION_LABELS)
-    )
-
-    starts = []
-    for i, line in enumerate(lines):
-        if i in consumed:
-            continue
-        stripped = line.strip()
-        if (stripped and ALLCAPS_LINE_RE.match(stripped) and stripped not in labels
-                and not is_component_label(lines, i, profile.parse_ingredient_line,
-                                           stop_at=consumed)):
-            starts.append(i)
-    return starts
 
 
 def split_on_lines(text, max_chars):
@@ -100,6 +53,26 @@ def split_on_lines(text, max_chars):
     return parts
 
 
+def join_title_lines(segment_lines, first_index, title_indices):
+    """A recipe segment with its title on one line: the title's wrapped
+    lines ("BROWN-BUTTER CARROT CAKE WITH" / "CREAM CHEESE FROSTING")
+    joined with a space, or with none after a hyphen ("UPSIDE-" /
+    "DOWN"). Then the title is simply a recipe chunk's first line, for
+    query and scale (books/engine.Profile.extract_title), and its words
+    sit together for the embedding."""
+    n = 0
+    while n < len(segment_lines) and first_index + n in title_indices:
+        n += 1
+    if n < 2:
+        return segment_lines
+    title = ""
+    for line in (l.strip() for l in segment_lines[:n]):
+        if not line:
+            continue
+        title = f"{title}{line}" if title.endswith(("-", "–")) or not title else f"{title} {line}"
+    return [title] + segment_lines[n:]
+
+
 def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=3000, layout=None):
     """Split the book into (text, content_type, page_num, confirmed,
     extra_metadata) chunks. Recipe boundaries (title through its
@@ -122,14 +95,15 @@ def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=
 
     layout, the extracted line records parallel to lines (see
     ingest_utils/extract.py), is passed on to the book's
-    find_recipe_starts, and to its own find_section_starts if it has one
-    (a book that can tell its headings by type size).
+    find_recipe_starts and find_section_starts, which tell headings by
+    type size (books/engine.py).
     """
     recipe_starts, consumed = profile.find_recipe_starts(lines, layout)
-    if hasattr(profile, "find_section_starts"):
-        section_starts = profile.find_section_starts(lines, layout, consumed)
-    else:
-        section_starts = find_section_starts(lines, consumed, book_title, profile)
+    # A book whose titles are found by size (books/engine.py) has
+    # consumed = exactly its title lines, so a wrapped title can be put
+    # back on one line.
+    join_titles = hasattr(profile, "TITLE_MIN_SIZE")
+    section_starts = profile.find_section_starts(lines, layout, consumed)
 
     boundary_types = {i: "recipe" for i in recipe_starts}
     boundary_types.update({i: "other" for i in section_starts})
@@ -139,7 +113,10 @@ def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=
     recipe_index = 0
     prev_end = 0
     for boundary in boundary_points:
-        segment_text = "\n".join(lines[prev_end:boundary]).strip()
+        segment_lines = lines[prev_end:boundary]
+        if join_titles and boundary_types.get(prev_end) == "recipe":
+            segment_lines = join_title_lines(segment_lines, prev_end, consumed)
+        segment_text = "\n".join(segment_lines).strip()
         if segment_text:
             # prev_end == 0 and not itself a detected boundary means this is
             # front matter / table of contents before the first recipe or

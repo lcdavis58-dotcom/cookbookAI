@@ -1,42 +1,50 @@
 """
 Per-cookbook format rules. Each book with a consistent, detectable layout
-gets one module here holding everything specific to that book's format,
-used by all three main scripts:
+gets a module here, mostly settings: the shared engine (books/engine.py)
+does the work, and a module only adds code for what's truly its own.
 
-    find_recipe_starts(lines)        ingest: where each recipe begins
-    extract_title(text, include_subtitle=True)
-                                     query/scale: a recipe chunk's title
-    parse_ingredient_line(line)      scale: one ingredient line -> dict
-    ingredient_start(lines)          scale: where the ingredient list begins
-    STEP_RE                          scale: an instruction step (ends the list)
-    section_label(line)              scale: group name for a label shape of the
-                                     book's own, or None (ALL-CAPS component
-                                     labels are found by the shared engine)
-    BATCH_LABEL_RE                   scale: labels that are alternative batch
-                                     sizes (scale ONE of them), or None
-    SKIP_RE                          scale: lines to ignore in the list, or None
+Settings (see books/engine.py for all of them):
 
-find_recipe_starts gets layout too: the extracted line records parallel
-to lines (font size, bold, position, see ingest_utils/extract.py), for a
-book whose titles are told by type size. Optional:
+    TITLE_MIN_SIZE      ingest: smallest type size of its recipe titles
+    YIELD_RE            ingest: the line between every title and the next
+                        heading ("Makes ...", "YIELD:", "Season:")
+    INGREDIENT_STYLE    scale: how amounts are printed, a style from
+                        books/line_styles.py ("metric_slash", ...)
+    HEADER_FIELD_RE, INGREDIENTS_AFTER_RE, INGREDIENTS_RIGHT_AFTER
+                        scale: where the ingredient list starts
+    STEP_RE             scale: an instruction step (ends the list);
+                        numbered steps ("1. ...") by default
+    BATCH_LABEL_RE      scale: labels that are alternative batch sizes
+                        (scale ONE of them), or None
+    SKIP_RE             scale: lines to ignore in the list, or None
+    ASIDE_RE            scale: the book's own asides that end the list
 
+Functions a module can define in place of the engine's:
+
+    find_recipe_starts(lines, layout)
+                        ingest: (recipe start lines, title lines)
     find_section_starts(lines, layout, consumed)
-                                     ingest: where non-recipe sections
-                                     begin, instead of the shared ALL-CAPS
-                                     rule in ingest_utils/chunking.py
-    ingredient_end(lines, start)     scale: where the ingredient list ends,
-                                     for a book whose STEP_RE can't tell
+                        ingest: where non-recipe sections begin
+    extract_title(text, include_subtitle=True)
+                        query/scale: a recipe chunk's title
+    parse_ingredient_line(line)
+                        scale: one ingredient line -> dict
+    ingredient_start(lines), ingredient_end(lines, start)
+                        scale: where the ingredient list begins and ends
+    section_label(line) scale: group name for a label shape of the book's
+                        own, or None (ALL-CAPS component labels are found
+                        by the shared engine)
     is_continuation(pending, last_line, line)
-                                     scale: more ways a line can be the wrap
-                                     of the ingredient line before it
-                                     (pending, joined so far; last_line, its
-                                     last line as printed)
+                        scale: more ways a line can be the wrap of the
+                        ingredient line before it
 
-Adding a book: write a module with those names, then add it to both
-tables below.
+Adding a book: find its title size and yield line with
+tools/diagnostics/book_report.py (--anchor), write a module with the
+settings, then add it to both tables below.
 """
 
 from books import book_on_pie, bravetart, dessert_person
+from books.engine import Profile
 
 # Lowercased, stripped book title -> strategy name. The title is the one
 # in common/config.BOOK_FILES and stored on every chunk. A book missing from here
@@ -49,11 +57,12 @@ RECIPE_AWARE_BOOKS = {
     "bravetart": "bravetart",
 }
 
-# Strategy name -> the module holding that format's rules.
+# Strategy name -> that book's rules: its module, with the shared
+# engine's defaults (books/engine.py) for whatever the module leaves out.
 PROFILES = {
-    "book_on_pie": book_on_pie,
-    "dessert_person": dessert_person,
-    "bravetart": bravetart,
+    "book_on_pie": Profile(book_on_pie),
+    "dessert_person": Profile(dessert_person),
+    "bravetart": Profile(bravetart),
 }
 
 
@@ -65,9 +74,9 @@ def strategy_for(book_title):
 
 
 def profile_for(strategy):
-    """The rules module for a strategy. Falls back to Book on Pie's, the
+    """The rules for a strategy. Falls back to Book on Pie's, the
     original format, for anything unlisted."""
-    return PROFILES.get(strategy, book_on_pie)
+    return PROFILES.get(strategy, PROFILES["book_on_pie"])
 
 
 def profile_for_book(book_title):
