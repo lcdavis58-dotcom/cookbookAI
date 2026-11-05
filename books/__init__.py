@@ -45,7 +45,7 @@ settings, then add it to both tables below.
 
 from books import (book_on_pie, bravetart, cookie_book, cooking_for_two, dessert_person, fearless_baker,
                    flour_water_salt_yeast, food_lab,
-                   genius_desserts, genius_recipes, htcev, milk_bar, salt_fat_acid_heat,
+                   genius_desserts, genius_recipes, htcev, milk_bar, ratio, salt_fat_acid_heat,
                    savory_baking, whats_for_dessert)
 from books.engine import Profile
 
@@ -70,6 +70,7 @@ RECIPE_AWARE_BOOKS = {
     "the food lab": "food_lab",
     "salt fat acid heat": "salt_fat_acid_heat",
     "flour water salt yeast": "flour_water_salt_yeast",
+    "ratio": "ratio",
 }
 
 # Strategy name -> that book's rules: its module, with the shared
@@ -90,6 +91,7 @@ PROFILES = {
     "food_lab": Profile(food_lab),
     "salt_fat_acid_heat": Profile(salt_fat_acid_heat),
     "flour_water_salt_yeast": Profile(flour_water_salt_yeast),
+    "ratio": Profile(ratio),
 }
 
 

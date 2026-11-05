@@ -73,7 +73,8 @@ def parse_amount(text):
     if not text:
         return None
 
-    m = re.match(rf"^(\d+)?({'|'.join(re.escape(c) for c in FRACTIONS)})?$", text)
+    # "1½", or "1 ½" with a space (Ratio, a few lines elsewhere).
+    m = re.match(rf"^(\d+)?\s?({'|'.join(re.escape(c) for c in FRACTIONS)})?$", text)
     if m and (m.group(1) or m.group(2)):
         whole = float(m.group(1)) if m.group(1) else 0.0
         frac = FRACTIONS[m.group(2)] if m.group(2) else 0.0
@@ -95,7 +96,7 @@ def parse_amount(text):
 # "1 1/2"). PDFs often encode typed fractions with U+2044 FRACTION SLASH
 # rather than "/", so both count.
 AMOUNT = (
-    rf"(?:\d+\s+\d+[/⁄]\d+|\d+[/⁄]\d+|\d*[{FRACTION_CHARS}]|\d+(?:\.\d+)?)"
+    rf"(?:\d+\s+\d+[/⁄]\d+|\d+[/⁄]\d+|\d* ?[{FRACTION_CHARS}]|\d+(?:\.\d+)?)"
 )
 _TYPED_FRACTION_RE = re.compile(r"^(?:(\d+)\s+)?(\d+)[/⁄](\d+)$")
 _SMALL_DENOMINATORS = {2, 3, 4, 8}

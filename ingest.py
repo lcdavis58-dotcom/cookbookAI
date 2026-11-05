@@ -61,6 +61,7 @@ INGEST_BOOKS = [
     "The Food Lab",
     "Salt Fat Acid Heat",
     "Flour Water Salt Yeast",
+    "Ratio",
 ]
 
 

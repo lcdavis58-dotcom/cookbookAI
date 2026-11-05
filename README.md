@@ -18,6 +18,7 @@ Currently supported books (each has its own settings in `books/`):
 - *The Food Lab*
 - *Salt Fat Acid Heat*
 - *Flour Water Salt Yeast*
+- *Ratio*
 
 ## What it does
 
