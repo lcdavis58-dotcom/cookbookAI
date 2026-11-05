@@ -99,6 +99,15 @@ def chunk_recipe_aware(lines, page_starts, book_title, profile, max_chunk_chars=
     type size (books/engine.py).
     """
     recipe_starts, consumed = profile.find_recipe_starts(lines, layout)
+    # A book whose method can't be told from its ingredients by the words
+    # alone (How to Cook Everything Vegetarian: both are body text, the
+    # steps unnumbered, only the font differs) names the first line after
+    # each list; a blank line goes before it, which scale reads as the
+    # list's end (books/engine.Profile.ingredient_end). Line positions
+    # don't change.
+    list_ends = profile.list_end_lines(lines, layout) if layout is not None else set()
+    if list_ends:
+        lines = [f"\n{line}" if i in list_ends else line for i, line in enumerate(lines)]
     # A book whose titles are found by size (books/engine.py) has
     # consumed = exactly its title lines, so a wrapped title can be put
     # back on one line.

@@ -57,6 +57,7 @@ INGEST_BOOKS = [
     "Genius Desserts",
     "Genius Recipes",
     "The Complete Cooking For Two Cookbook",
+    "How to Cook Everything Vegetarian",
 ]
 
 

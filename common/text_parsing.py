@@ -98,6 +98,7 @@ AMOUNT = (
     rf"(?:\d+\s+\d+[/⁄]\d+|\d+[/⁄]\d+|\d*[{FRACTION_CHARS}]|\d+(?:\.\d+)?)"
 )
 _TYPED_FRACTION_RE = re.compile(r"^(?:(\d+)\s+)?(\d+)[/⁄](\d+)$")
+_SMALL_DENOMINATORS = {2, 3, 4, 8}
 
 TSP_PER_TBSP = 3
 TSP_PER_CUP = 48
@@ -116,10 +117,15 @@ def parse_typed_amount(text):
     m = _TYPED_FRACTION_RE.match(text.strip())
     if m:
         whole = int(m.group(1)) if m.group(1) else 0
-        denominator = int(m.group(3))
+        numerator, denominator = m.group(2), int(m.group(3))
         if denominator == 0:
             return None
-        return whole + int(m.group(2)) / denominator
+        # "11/2" is 1 1/2 with the space lost in the PDF (How to Cook
+        # Everything Vegetarian): recipes never print improper fractions.
+        if (not whole and len(numerator) >= 2 and denominator in _SMALL_DENOMINATORS
+                and int(numerator[-1]) < denominator):
+            whole, numerator = int(numerator[:-1]), numerator[-1]
+        return whole + int(numerator) / denominator
     return parse_amount(text)
 
 

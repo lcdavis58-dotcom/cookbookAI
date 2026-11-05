@@ -202,7 +202,7 @@ def _is_listed(line, parse, max_unmeasured_chars, purpose_re):
 # The functions a book module can define to replace the engine's.
 INTERFACE = {
     "find_recipe_starts", "find_section_starts", "extract_title", "parse_ingredient_line",
-    "ingredient_start", "ingredient_end", "is_continuation", "section_label",
+    "ingredient_start", "ingredient_end", "is_continuation", "section_label", "list_end_lines",
 }
 _SUBTITLE_RE = re.compile(r"^with\s+\S")
 _WITH_TAIL_RE = re.compile(r"\s+with\s+", re.IGNORECASE)
@@ -272,6 +272,13 @@ class Profile:
 
     def find_section_starts(self, lines, layout, consumed):
         return section_starts_by_size(self.headings(layout), consumed)
+
+    def list_end_lines(self, lines, layout):
+        """Line indices that start a recipe's method right after its
+        ingredient list, for a book whose lines can't tell (ingest puts a
+        blank line before each; see ingest_utils/chunking.py). None by
+        default."""
+        return set()
 
     # query / scale --------------------------------------------------------
 

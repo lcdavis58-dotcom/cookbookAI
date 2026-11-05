@@ -118,6 +118,7 @@ _FOOTNOTE_RE = re.compile(r"[①-⑳]")
 # half is skipped over rather than parsed, the gram figure is what we keep.
 _METRIC_PAREN_RE = re.compile(r"\(\s*(?:[^()]*?oz\s*/\s*)?([\d.,]+)\s*(k?g)\s*\)")
 _PAREN_UNIT = r"(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|sticks?)"
+_GLUED_FRACTION_RE = re.compile(r"\b(\d+?)(\d/[2348])\b")
 # The Cookie Book's liquids: "1 tablespoon (15 ml) real vanilla extract".
 # Only right after an amount and a volume unit, so "1 (750 ml) bottle"
 # stays a count.
@@ -194,8 +195,10 @@ def volume_paren_metric(line):
         if single:
             amt, range_end, unit = single.groups()
             imperial_amount = parse_typed_amount(amt)
-            if range_end:
-                imperial_display = line[:single.end()].strip()
+            # The book's own wording ("¼ cup", "1–2 teaspoons") for the
+            # unscaled side, not "0.25 cup"; "11/2 cups" (a lost space,
+            # see parse_typed_amount) shows as "1 1/2 cups".
+            imperial_display = _GLUED_FRACTION_RE.sub(r"\1 \2", line[:single.end()].strip())
             imperial_unit = canonical_volume_unit(unit)
             if imperial_amount is None:
                 return None
