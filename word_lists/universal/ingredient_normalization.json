@@ -21,7 +21,7 @@
 
   "_leading_phrases": "Regular expressions removed from the front of a name before leading_words. Mostly leftovers from lines a parser only half understood: ranges ('7 to 14 g / 1 to 2 tablespoons cornstarch' leaves 'to 14 g / ...'), a second measure, 'plus a pinch of'.",
   "leading_phrases": [
-    "^(?:plus\\s+)?(?:a\\s+|several\\s+)?(?:pinch|dash)(?:es)?\\s+of\\s+",
+    "^(?:plus\\s+)?(?:a\\s+|several\\s+)?(?:pinch|dash)(?:es)?\\s+(?:or\\s+two\\s+)?(?:of\\s+)?",
     "^(?:[a-z]+\\s+)?but\\s+\\S+\\s+",
     "^pieces?\\s+(?:of\\s+)?",
     "^other\\s+",

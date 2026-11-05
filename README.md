@@ -13,6 +13,7 @@ Currently supported books (each has its own settings in `books/`):
 - *Momofuku Milk Bar*
 - *Genius Desserts*
 - *Genius Recipes*
+- *The Complete Cooking For Two Cookbook*
 
 ## What it does
 

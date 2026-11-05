@@ -56,6 +56,7 @@ INGEST_BOOKS = [
     "Momofuku Milk Bar",
     "Genius Desserts",
     "Genius Recipes",
+    "The Complete Cooking For Two Cookbook",
 ]
 
 

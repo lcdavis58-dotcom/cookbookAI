@@ -123,7 +123,9 @@ _PAREN_UNIT = r"(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|sticks?)"
 # stays a count.
 # A range ("1 to 2 tablespoons (15 to 30 ml) milk") scales from its low
 # end, and its wording is kept for display, as in volume_pipe_weight.
-_RANGE_END = rf"(?:\s+to\s+{AMOUNT})?"
+# Also with a dash: "1–2 teaspoons", "¼-½ teaspoon", "¼–⅓cup" (Cooking
+# For Two).
+_RANGE_END = rf"(?:\s+to\s+{AMOUNT}|\s*[–-]\s*{AMOUNT})?"
 _ML_AFTER_UNIT_RE = re.compile(
     rf"^(?:{AMOUNT}){_RANGE_END}\s*{_PAREN_UNIT}(\s+\(\s*([\d.,]+)(?:\s+to\s+[\d.,]+)?\s*ml\s*\))",
     re.IGNORECASE)
@@ -133,7 +135,9 @@ _COMPOUND_RE = re.compile(
 )
 # A count, then the name, or a size in parentheses first: "2 (3-inch)
 # cinnamon sticks", "1 (750 ml) bottle dry rosé wine".
-_PAREN_COUNT_RE = re.compile(rf"^({AMOUNT})\s+(?=[A-Za-z(])")
+# A count range scales from its low end too ("4–6 slices bacon"), and an
+# amount can be glued to its word ("⅛ounce dried porcini").
+_PAREN_COUNT_RE = re.compile(rf"^({AMOUNT})(?:\s*[–-]\s*{AMOUNT}(?=\s))?\s*(?=[A-Za-z(])")
 
 
 def volume_paren_metric(line):
