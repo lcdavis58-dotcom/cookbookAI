@@ -60,6 +60,7 @@ INGEST_BOOKS = [
     "How to Cook Everything Vegetarian",
     "The Food Lab",
     "Salt Fat Acid Heat",
+    "Flour Water Salt Yeast",
 ]
 
 

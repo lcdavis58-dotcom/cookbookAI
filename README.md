@@ -17,6 +17,7 @@ Currently supported books (each has its own settings in `books/`):
 - *How to Cook Everything Vegetarian*
 - *The Food Lab*
 - *Salt Fat Acid Heat*
+- *Flour Water Salt Yeast*
 
 ## What it does
 

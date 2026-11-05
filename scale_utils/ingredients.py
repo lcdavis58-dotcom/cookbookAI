@@ -210,6 +210,14 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
             trace("batch description", stripped)
             continue
         describing = None
+        # A line the book says to skip is never a group label, even when
+        # it's shaped like one (Flour Water Salt Yeast's "QUANTITY" column
+        # header).
+        if book.SKIP_RE and book.SKIP_RE.match(stripped):
+            flush()
+            skipped_text = stripped
+            trace("skipped", stripped)
+            continue
         group_name = book.section_label(stripped)
         if not group_name and heading and _labels_group(lines, i, book.parse_ingredient_line,
                                                         in_ingredients):
@@ -223,11 +231,6 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
                 describing = current
             in_ingredients = True
             trace("group label", stripped)
-            continue
-        if book.SKIP_RE and book.SKIP_RE.match(stripped):
-            flush()
-            skipped_text = stripped
-            trace("skipped", stripped)
             continue
         if book.STEP_RE.match(stripped):
             flush()

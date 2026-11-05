@@ -48,7 +48,7 @@ _NUMBER_WORDS = {
     "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
 }
 # An item's size: "3-inch", "12- to 16-pound", "28-ounce".
-_SIZE_RE = re.compile(rf"^[\d{FRACTION_CHARS}./]+-?(?:\s*to\s*[\d{FRACTION_CHARS}./]+)?\s?-(?:inch|pound|ounce|quart)\b",
+_SIZE_RE = re.compile(rf"^[\d{FRACTION_CHARS}./]+-?(?:\s*to\s*[\d{FRACTION_CHARS}./]+)?\s?-(?:inch|pound|ounce|quart|gram)\b",
                       re.IGNORECASE)
 # A count in digits before a size: "1 2-pound salmon filet", "2 1-inch
 # strips of lemon zest".

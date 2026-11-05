@@ -26,6 +26,7 @@
     "^pieces?\\s+(?:of\\s+)?",
     "^other\\s+",
     "^drops?\\s+(?:of\\s+)?",
+    "^grams?\\s+(?:of\\s+)?",
     "^(?:a\\s+)?(?:dab|splash|squeeze|knob|handful)\\s+of\\s+",
     "^[\\d½¼¾./]+-?(?:\\s*to\\s*[\\d½¼¾./]+)?\\s?-(?:inch|pound|ounce|quart)(?:-thick)?\\s*(?:/\\s*[\\d.]+[- ]?cm\\s*)?\\s(?:(?:pieces?|cans?|bottles?|slices?)\\s+(?:of\\s+)?)?",
     "^(?:chunks?|knobs?|strips?|wedges?)\\s+of\\s+",
@@ -59,7 +60,7 @@
   "_comma_descriptors": "Words that describe an ingredient when printed alone before a comma, BraveTart style: 'cold, unsalted butter', 'whole, ripe strawberries', 'plump, moist, dried apples'. The word and its comma are dropped, so the cut at the first comma doesn't leave just 'cold'. Only words that are never the ingredient itself belong here.",
   "comma_descriptors": [
     "whole", "plump", "moist", "sticky", "unsweetened", "cold", "medium", "large",
-    "small", "ripe", "unpeeled", "soft", "firm", "fresh", "unseeded"
+    "small", "ripe", "unpeeled", "soft", "firm", "fresh", "unseeded", "mature"
   ],
 
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
@@ -67,6 +68,7 @@
     "sugar": "granulated sugar",
     "diamond crystal kosher salt": "kosher salt",
     "morton kosher salt": "kosher salt",
+    "active levain": "levain",
     "tablespooons unsalted butter": "unsalted butter",
     "ice water": "water",
     "cool water": "water",
