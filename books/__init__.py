@@ -44,7 +44,7 @@ settings, then add it to both tables below.
 """
 
 from books import (book_on_pie, bravetart, cookie_book, dessert_person, fearless_baker,
-                   milk_bar, savory_baking, whats_for_dessert)
+                   genius_desserts, milk_bar, savory_baking, whats_for_dessert)
 from books.engine import Profile
 
 # Lowercased, stripped book title -> strategy name. The title is the one
@@ -61,6 +61,7 @@ RECIPE_AWARE_BOOKS = {
     "the cookie book": "cookie_book",
     "savory baking": "savory_baking",
     "momofuku milk bar": "milk_bar",
+    "genius desserts": "genius_desserts",
 }
 
 # Strategy name -> that book's rules: its module, with the shared
@@ -74,6 +75,7 @@ PROFILES = {
     "cookie_book": Profile(cookie_book),
     "savory_baking": Profile(savory_baking),
     "milk_bar": Profile(milk_bar),
+    "genius_desserts": Profile(genius_desserts),
 }
 
 

@@ -121,6 +121,10 @@ def section_starts_by_size(headings, consumed):
 # A line left hanging, so the next one continues it: "plus 30-",
 # "DIFFICULTY:", "ACTIVE TIME: 30 minutes |".
 _HANGING_END_RE = re.compile(r"(?:-|\bto|\bplus|,|\(|:|\|)$")
+# The ALL-CAPS wrap of an ALL-CAPS yield line opens with a joining word
+# ("INTO LARGE OR SMALL BARS"); a group label right after the yield
+# ("ICE CREAM") doesn't.
+_CAPS_WRAP_RE = re.compile(r"^(?:INTO|OR|AND|WITH|FOR|OF|TO|PLUS|ABOUT|EACH|PER|IN|ON)\b[A-Z0-9 ,&;'’()\-]*$")
 
 
 def yield_block_length(lines, i, field_re=None):
@@ -128,7 +132,10 @@ def yield_block_length(lines, i, field_re=None):
     goes on while the next line carries one of the book's header fields
     (field_re: "ACTIVE TIME:", "DIFFICULTY:"), starts with "|" or a
     lowercase letter, closes a parenthesis left open, or finishes a line
-    left hanging."""
+    left hanging. An ALL-CAPS yield line goes on onto an ALL-CAPS line
+    that opens with a joining word ("MAKES ONE 9-INCH (23CM) SQUARE PAN,
+    WHICH CAN BE CUT" / "INTO LARGE OR SMALL BARS"), which would otherwise
+    read as a group label."""
     n = 1
     while i + n < len(lines):
         line = lines[i + n].strip()
@@ -138,7 +145,8 @@ def yield_block_length(lines, i, field_re=None):
             break
         if ((field_re is not None and field_re.search(line)) or line.startswith("|")
                 or line[:1].islower() or block.count("(") > block.count(")")
-                or _HANGING_END_RE.search(prev)):
+                or _HANGING_END_RE.search(prev)
+                or (prev.isupper() and _CAPS_WRAP_RE.match(line))):
             n += 1
             continue
         break

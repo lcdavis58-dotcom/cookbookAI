@@ -11,6 +11,7 @@ Currently supported books (each has its own settings in `books/`):
 - *The Cookie Book*
 - *Savory Baking*
 - *Momofuku Milk Bar*
+- *Genius Desserts*
 
 ## What it does
 

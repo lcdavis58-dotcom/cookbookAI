@@ -116,7 +116,7 @@ def metric_slash(line):
 _FOOTNOTE_RE = re.compile(r"[①-⑳]")
 # "(7 oz / 200g)", "(1½ oz / 43g)", or grams alone "(200g)". The ounce
 # half is skipped over rather than parsed, the gram figure is what we keep.
-_METRIC_PAREN_RE = re.compile(r"\(\s*(?:[^()]*?oz\s*/\s*)?([\d.,]+)\s*g\s*\)")
+_METRIC_PAREN_RE = re.compile(r"\(\s*(?:[^()]*?oz\s*/\s*)?([\d.,]+)\s*(k?g)\s*\)")
 _PAREN_UNIT = r"(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|sticks?)"
 # The Cookie Book's liquids: "1 tablespoon (15 ml) real vanilla extract".
 # Only right after an amount and a volume unit, so "1 (750 ml) bottle"
@@ -165,6 +165,7 @@ def volume_paren_metric(line):
             metric_amount = float(m.group(1).replace(",", ""))
         except ValueError:
             metric_amount = None
+        metric_unit = m.group(2).lower()  # "(1.2kg)" as well as "(150g)"
         line = (line[:m.start()] + line[m.end():])
         line = re.sub(r"\s+", " ", line).strip()
         line = re.sub(r"\s+,", ",", line)

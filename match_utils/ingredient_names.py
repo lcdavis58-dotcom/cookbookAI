@@ -35,6 +35,7 @@ _PAREN_RE = re.compile(r"\([^()]*\)?")
 # off ("1 loaf brioche, crusts removed").
 _SUB_RECIPE_RE = re.compile(r"\bbatch\b|\bpage\s+\d+|\brecipes?\b|\bthis page\b"
                             r"|\bsee below\b|\brecipe follows\b|\bcrusts?\b(?!\s+(?:removed|trimmed))")
+_OPTIONAL_STEP_RE = re.compile(r"\b\w+ing\s+(?:it\s+|them\s+)?is\s+optional\b")
 _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|garnish|topping)\b"
                           r"|\bfor the (?:pan|pans|baking sheet|work surface)\b")
 
@@ -104,7 +105,8 @@ def normalize(name):
     # "butter, at room temperature, plus more for the pan" still needs the
     # butter, only the "plus more" part is pan prep, so look for optional
     # wording before any "plus" clause.
-    if _OPTIONAL_RE.search(re.split(r",?\s+plus\b", text, maxsplit=1)[0]):
+    # "peeling is optional" makes a prep step optional, not the ingredient.
+    if _OPTIONAL_RE.search(_OPTIONAL_STEP_RE.sub("", re.split(r",?\s+plus\b", text, maxsplit=1)[0])):
         flags.add("optional")
     if _SUB_RECIPE_RE.search(text):
         flags.add("sub_recipe")
