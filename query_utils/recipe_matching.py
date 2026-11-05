@@ -31,10 +31,19 @@ def display_title(title):
     are already mixed case (Dessert Person) are left exactly as printed,
     so "with Mango Caramel" doesn't become "With Mango Caramel".
     str.title() starts a new word after an apostrophe ("Angel’S"), so
-    the letter after one is put back in lowercase."""
+    the letter after one (or after "!", "Sh!t") is put back in lowercase,
+    and so is a single letter ending a hyphenated word ("Peanut-y").
+    Short joining words stay lowercase after the first word ("Cookies
+    with Ganache", "Dulce de Leche"), and a short word of consonants
+    other than y and h ("My", "Sh!t") is an abbreviation kept in
+    capitals ("GF", "BBQ")."""
     if not title.isupper():
         return title
-    return re.sub(r"(?<=[’'])[A-Z]", lambda m: m.group(0).lower(), title.title())
+    titled = re.sub(r"(?<=[’'!])[A-Z]", lambda m: m.group(0).lower(), title.title())
+    titled = re.sub(r"(?<=\w-)[A-Z](?![\w’'])", lambda m: m.group(0).lower(), titled)
+    titled = re.sub(r"\b[B-DFGJ-NP-TV-XZ][b-dfgj-np-tv-xz]{1,2}\b(?!\.)", lambda m: m.group(0).upper(), titled)
+    small = r"(?:And|Or|With|Of|The|A|An|In|On|For|To|De)"
+    return re.sub(rf"(?<=\s){small}(?=\s)|(?<=-){small}(?=-)", lambda m: m.group(0).lower(), titled)
 
 
 def extract_yield_line(text):

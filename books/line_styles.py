@@ -115,7 +115,16 @@ _FOOTNOTE_RE = re.compile(r"[①-⑳]")
 # half is skipped over rather than parsed, the gram figure is what we keep.
 _METRIC_PAREN_RE = re.compile(r"\(\s*(?:[^()]*?oz\s*/\s*)?([\d.,]+)\s*g\s*\)")
 _PAREN_UNIT = r"(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|sticks?)"
-_SINGLE_RE = re.compile(rf"^({AMOUNT})\s*({_PAREN_UNIT})\s+", re.IGNORECASE)
+# The Cookie Book's liquids: "1 tablespoon (15 ml) real vanilla extract".
+# Only right after an amount and a volume unit, so "1 (750 ml) bottle"
+# stays a count.
+# A range ("1 to 2 tablespoons (15 to 30 ml) milk") scales from its low
+# end, and its wording is kept for display, as in volume_pipe_weight.
+_RANGE_END = rf"(?:\s+to\s+{AMOUNT})?"
+_ML_AFTER_UNIT_RE = re.compile(
+    rf"^(?:{AMOUNT}){_RANGE_END}\s*{_PAREN_UNIT}(\s+\(\s*([\d.,]+)(?:\s+to\s+[\d.,]+)?\s*ml\s*\))",
+    re.IGNORECASE)
+_SINGLE_RE = re.compile(rf"^({AMOUNT})({_RANGE_END})\s*({_PAREN_UNIT})\s+", re.IGNORECASE)
 _COMPOUND_RE = re.compile(
     rf"^({AMOUNT})\s*({_PAREN_UNIT})\s+plus\s+({AMOUNT})\s*({_PAREN_UNIT})\s+", re.IGNORECASE
 )
@@ -138,8 +147,17 @@ def volume_paren_metric(line):
     line = _FOOTNOTE_RE.sub("", original).strip()
 
     metric_amount = None
+    metric_unit = "g"
     m = _METRIC_PAREN_RE.search(line)
-    if m:
+    ml = None if m else _ML_AFTER_UNIT_RE.match(line)
+    if ml:
+        metric_unit = "ml"
+        try:
+            metric_amount = float(ml.group(2).replace(",", ""))
+        except ValueError:
+            metric_amount = None
+        line = line[:ml.start(1)] + line[ml.end(1):]
+    elif m:
         try:
             metric_amount = float(m.group(1).replace(",", ""))
         except ValueError:
@@ -166,8 +184,10 @@ def volume_paren_metric(line):
     else:
         single = _SINGLE_RE.match(line)
         if single:
-            amt, unit = single.groups()
+            amt, range_end, unit = single.groups()
             imperial_amount = parse_typed_amount(amt)
+            if range_end:
+                imperial_display = line[:single.end()].strip()
             imperial_unit = canonical_volume_unit(unit)
             if imperial_amount is None:
                 return None
@@ -186,7 +206,7 @@ def volume_paren_metric(line):
         "raw": original,
         "format": "dessert_person",
         "metric_amount": metric_amount,
-        "metric_unit": "g" if metric_amount is not None else None,
+        "metric_unit": metric_unit if metric_amount is not None else None,
         "imperial_amount": imperial_amount,
         "imperial_unit": imperial_unit,
         "imperial_display": imperial_display,

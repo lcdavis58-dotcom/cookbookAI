@@ -8,6 +8,7 @@ Currently supported books (each has its own settings in `books/`):
 - *BraveTart*
 - *The Fearless Baker*
 - *What's For Dessert*
+- *The Cookie Book*
 
 ## What it does
 

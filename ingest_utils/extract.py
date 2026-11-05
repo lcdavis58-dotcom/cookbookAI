@@ -39,7 +39,7 @@ from common.config import EXTRACT_DIR
 
 # Bump when the saved shape or the text rules change, so old saved
 # extractions get rebuilt instead of read.
-EXTRACT_VERSION = 1
+EXTRACT_VERSION = 2
 
 # Typographic ligatures some PDFs store as a single character (Dessert
 # Person stores "Difficulty" as "Difﬁculty" and "flour" as
@@ -49,9 +49,14 @@ EXTRACT_VERSION = 1
 # NOT full unicodedata NFKC normalization, which would also turn "½"
 # into "1⁄2" and "①" into "1", breaking the unicode-fraction
 # ingredient parser and the footnote-marker stripping.
+#
+# The Cookie Book's ebook conversion maps its ligature glyphs to IPA
+# letters instead ("ɻour", "ɹrm", "coʃee", "puɽer", "truʀes"). No book
+# uses those letters as themselves, so they're expanded the same way.
 LIGATURES = str.maketrans({
     "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl",
     "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "st", "ﬆ": "st",
+    "ʃ": "ff", "ɹ": "fi", "ɻ": "fl", "ɽ": "ffi", "ʀ": "ffl",
 })
 
 _BOLD_FONT_RE = re.compile(r"bold|black|heavy|semibold|demi", re.IGNORECASE)
