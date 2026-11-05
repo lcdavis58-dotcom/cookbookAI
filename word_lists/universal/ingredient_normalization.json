@@ -36,7 +36,8 @@
     "^wide\\s+strips?\\s+",
     "^[\\d.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
     "^fresh\\s+or\\s+frozen\\s+",
-    "^[\\d½¼¾]+-inch\\s*(?:/\\s*[\\d.]+-cm\\s*)?(?:pieces?\\s+)?",
+    "^[\\d½¼¾]+-inch\\s*(?:/\\s*[\\d.]+[- ]?cm\\s*)?(?:pieces?\\s+)?",
+    "^[\\d.]+(?:\\s+to\\s+[\\d.]+)?\\s*(?:g|ml)\\s*/\\s*[\\d.]+-?(?:\\s+to\\s+[\\d.]+)?[- ]ounces?\\s+(?:(?:can|bottle|jar|package|bag)\\s+)?",
     "^firm\\s+ripe\\s+",
     "^of\\s+",
     "^[\\d½¼¾]+-ounce\\s+"

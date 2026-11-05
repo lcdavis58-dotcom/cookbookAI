@@ -9,6 +9,7 @@ Currently supported books (each has its own settings in `books/`):
 - *The Fearless Baker*
 - *What's For Dessert*
 - *The Cookie Book*
+- *Savory Baking*
 
 ## What it does
 

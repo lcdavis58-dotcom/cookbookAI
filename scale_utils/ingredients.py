@@ -106,6 +106,18 @@ def _continues_skipped(skipped, line, parse):
             or (line[:1].isdigit() and not parse(line)))
 
 
+def _labels_group(lines, i, parse, in_ingredients):
+    """Whether the heading at lines[i] labels a group of ingredients: an
+    ingredient the book's parser reads follows it (is_component_label).
+    While the list is still going, a line only the fallbacks read will
+    do too, for a group of unmeasured things ("GARNISH" / "Cherry
+    tomatoes, halved"); after the steps start, that would let any
+    heading restart the list."""
+    if is_component_label(lines, i, parse):
+        return True
+    return in_ingredients and is_component_label(lines, i, lambda s: parse_fallback(s, parse))
+
+
 def extract_ingredient_groups(chunk_text, strategy, trace=None):
     """Split a recipe's ingredient block into named groups using the
     book's format rules. Wrapped ingredient lines are joined back into one
@@ -199,7 +211,8 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
             continue
         describing = None
         group_name = book.section_label(stripped)
-        if not group_name and heading and is_component_label(lines, i, book.parse_ingredient_line):
+        if not group_name and heading and _labels_group(lines, i, book.parse_ingredient_line,
+                                                        in_ingredients):
             group_name = label_title(heading)
         if group_name:
             flush()

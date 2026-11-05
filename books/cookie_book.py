@@ -24,9 +24,8 @@ them (ingest_utils/extract.py).
 
 import re
 
+from books.engine import end_of_unmarked_list
 from books.line_styles import STYLES
-from common.text_parsing import heading_text
-from scale_utils.line_fallbacks import parse_fallback
 
 TITLE_MIN_SIZE = 27
 YIELD_RE = re.compile(r"^MAKES\b")
@@ -49,39 +48,6 @@ _PURPOSE_RE = re.compile(
     re.IGNORECASE)
 
 
-def _is_ingredient(line):
-    if _parse(line):
-        return True
-    parsed = parse_fallback(line, _parse)
-    if parsed is None:
-        return False
-    if not parsed.get("unmeasured"):
-        return True
-    return len(line) <= _UNMEASURED_MAX_CHARS or bool(_PURPOSE_RE.search(line))
-
-
-def _is_wrap(pending, line):
-    """The shared wrap signals (scale_utils/ingredients.py): a parenthesis
-    left open, or a lowercase or "(" start."""
-    return pending.count("(") > pending.count(")") or line[:1].islower() or line.startswith("(")
-
-
 def ingredient_end(lines, start):
-    """Where the steps begin: the first line from start that isn't an
-    ingredient, the wrap of one, or an ALL-CAPS group label."""
-    pending = None
-    for i in range(start, len(lines)):
-        line = lines[i].strip()
-        if not line:
-            continue
-        if pending is not None and _is_wrap(pending, line):
-            pending = f"{pending} {line}"
-            continue
-        if heading_text(line):
-            pending = None
-            continue
-        if _is_ingredient(line):
-            pending = line
-            continue
-        return i
-    return len(lines)
+    """Where the steps begin: see books/engine.end_of_unmarked_list."""
+    return end_of_unmarked_list(lines, start, _parse, _UNMEASURED_MAX_CHARS, _PURPOSE_RE)

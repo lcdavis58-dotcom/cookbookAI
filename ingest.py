@@ -52,6 +52,7 @@ INGEST_BOOKS = [
     "The Fearless Baker",
     "What's For Dessert",
     "The Cookie Book",
+    "Savory Baking",
 ]
 
 

@@ -24,7 +24,7 @@ from common.text_parsing import FRACTION_CHARS, heading_text, parse_amount
 # A word in front of a normal amount that hedges it. Scaling keeps the
 # word and scales the amount ("scant 1 g" -> "scant 2 g").
 _QUALIFIER_RE = re.compile(
-    rf"^(scant|about|up to|generous|heaping|roughly|approximately|a pinch plus)\s+(?=[\d{FRACTION_CHARS}])",
+    rf"^(scant|about|up to|generous|heaping|roughly|approximately|a pinch plus|<)\s*(?=[\d{FRACTION_CHARS}])",
     re.IGNORECASE)
 
 _PINCH_RE = re.compile(r"^(?:an?\s+)?(?:(small|large|generous|big|hefty)\s+)?(pinch|dash)(?:es)?"
@@ -61,6 +61,7 @@ _PART_OF_RE = re.compile(
 UNMEASURED_MAX_CHARS = 80
 # Private-use characters, which PDFs emit for glyphs in fonts they
 # couldn't map ("Mak Ahea" for a decorative heading).
+_WEB_ADDRESS_RE = re.compile(r"\S+\.(?:com|net|org)", re.IGNORECASE)
 _PRIVATE_USE_RE = re.compile("[-]")
 
 
@@ -86,7 +87,9 @@ def _looks_unmeasured(line):
             # A heading, including ones with parentheses the ALL-CAPS
             # shape doesn't allow ("TANGERINE (OR ORANGE) CURD").
             and not heading_text(line) and line != line.upper()
-            and not _PRIVATE_USE_RE.search(line))
+            and not _PRIVATE_USE_RE.search(line)
+            # A page footer the PDF carries ("OceanofPDF.com").
+            and not _WEB_ADDRESS_RE.fullmatch(line))
 
 
 def parse_fallback(line, parse):

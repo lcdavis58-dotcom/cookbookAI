@@ -21,6 +21,11 @@ Headings are told by size alone, so a book's settings say only:
                         italic lines that size are asides ("Mix it up!")
     MAX_TITLE_LINES     longer runs at heading size are prose, not a title
                         (some books set headnotes at 16.9)
+    TITLE_BOLD          True if only bold lines are headings (Savory
+                        Baking sets pull quotes at its title size)
+    TITLE_MAX_GAP       a heading line further below the one above than
+                        this (points) starts a heading of its own (a
+                        section name right above a recipe title)
 
 Sizes are compared against thresholds, never exact values: some books
 scale a page about 1% smaller (BraveTart's 24.7 / 14.8).
@@ -30,6 +35,7 @@ import re
 
 from books.line_styles import NUMBERED_STEP_RE, STYLES
 from common.text_parsing import heading_text, is_component_label
+from scale_utils.line_fallbacks import parse_fallback
 
 # How far below the setting a size can be and still count, for the
 # slightly scaled pages.
@@ -39,15 +45,24 @@ SIZE_TOLERANCE = 0.5
 class Headings:
     """The heading line ranges of a book's layout, per its settings."""
 
-    def __init__(self, layout, min_size, italic=False, max_lines=6):
+    def __init__(self, layout, min_size, italic=False, max_lines=6, bold=False, max_gap=None):
         self.min_size = min_size - SIZE_TOLERANCE
         self.italic = italic
         self.max_lines = max_lines
+        self.bold = bold
+        self.max_gap = max_gap
         self.ranges = self._find(layout)
 
     def _is_heading_line(self, record):
         return (record["size"] >= self.min_size and record["italic"] == self.italic
-                and bool(record["text"].strip()))
+                and (record["bold"] or not self.bold) and bool(record["text"].strip()))
+
+    def _continues(self, first, record):
+        """Whether a heading line goes on the heading that started with
+        first: on the same page, and close enough below when the book
+        sets a TITLE_MAX_GAP."""
+        return (record["page"] == first["page"]
+                and (self.max_gap is None or (record["gap"] or 0) <= self.max_gap))
 
     def _find(self, layout):
         """[(first, last)] line ranges of every heading: consecutive
@@ -62,7 +77,7 @@ class Headings:
                 continue
             j = i
             while (j + 1 < len(layout) and self._is_heading_line(layout[j + 1])
-                   and layout[j + 1]["page"] == layout[i]["page"]):
+                   and self._continues(layout[i], layout[j + 1])):
                 j += 1
             if j - i + 1 <= self.max_lines:
                 ranges.append((i, j))
@@ -80,7 +95,9 @@ def find_recipe_starts_by_size(lines, layout, settings):
         raise ValueError("this book's recipes are found by type size, so it needs the layout")
     headings = Headings(layout, settings.TITLE_MIN_SIZE,
                         italic=getattr(settings, "TITLE_ITALIC", False),
-                        max_lines=getattr(settings, "MAX_TITLE_LINES", 6))
+                        max_lines=getattr(settings, "MAX_TITLE_LINES", 6),
+                        bold=getattr(settings, "TITLE_BOLD", False),
+                        max_gap=getattr(settings, "TITLE_MAX_GAP", None))
     yield_re = settings.YIELD_RE
     starts, consumed = [], set()
     ranges = headings.ranges
@@ -128,6 +145,45 @@ def yield_block_length(lines, i, field_re=None):
     return n
 
 
+def end_of_unmarked_list(lines, start, parse, max_unmeasured_chars, purpose_re):
+    """Where an ingredient list ends when nothing marks the steps (The
+    Cookie Book's plain paragraphs, Savory Baking's few unnumbered
+    steps): the first line from start that isn't an ingredient, the wrap
+    of one (a parenthesis left open, a lowercase or "(" start) or an
+    ALL-CAPS group label. A line with no amount counts as an ingredient
+    only when it's short ("Sprinkles, optional") or says what it's for
+    (purpose_re); a step's first line runs the width of the column.
+    parse is the book's ingredient parser."""
+    pending = None
+    for i in range(start, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+        if pending is not None and (pending.count("(") > pending.count(")")
+                                    or line[:1].islower() or line.startswith("(")):
+            pending = f"{pending} {line}"
+            continue
+        if heading_text(line):
+            pending = None
+            continue
+        if _is_listed(line, parse, max_unmeasured_chars, purpose_re):
+            pending = line
+            continue
+        return i
+    return len(lines)
+
+
+def _is_listed(line, parse, max_unmeasured_chars, purpose_re):
+    if parse(line):
+        return True
+    parsed = parse_fallback(line, parse)
+    if parsed is None:
+        return False
+    if not parsed.get("unmeasured"):
+        return True
+    return len(line) <= max_unmeasured_chars or bool(purpose_re.search(line))
+
+
 # ---------------------------------------------------------------------------
 # A book's profile: its module, with these defaults for what it leaves out
 # ---------------------------------------------------------------------------
@@ -168,6 +224,8 @@ class Profile:
 
     TITLE_ITALIC = False
     MAX_TITLE_LINES = 6
+    TITLE_BOLD = False
+    TITLE_MAX_GAP = None
     STEP_RE = NUMBERED_STEP_RE
     SKIP_RE = None
     BATCH_LABEL_RE = None
@@ -191,7 +249,8 @@ class Profile:
 
     def headings(self, layout):
         return Headings(layout, self.TITLE_MIN_SIZE, italic=self.TITLE_ITALIC,
-                        max_lines=self.MAX_TITLE_LINES)
+                        max_lines=self.MAX_TITLE_LINES, bold=self.TITLE_BOLD,
+                        max_gap=self.TITLE_MAX_GAP)
 
     def find_recipe_starts(self, lines, layout=None):
         """(start_line_indices, title_line_indices): see
@@ -235,7 +294,17 @@ class Profile:
         if self.INGREDIENTS_RIGHT_AFTER:
             return after
         for i in range(after, len(lines)):
-            if lines[i].strip() and self.starts_ingredients(lines, i):
+            stripped = lines[i].strip()
+            if not stripped:
+                continue
+            # A recipe with no list of its own (Savory Baking's "Stuffed"
+            # Pretzels give amounts in the steps): the list can't start
+            # after a step. A header field ("DIFFICULTY: 2 (Easy)") can look
+            # like What's For Dessert's steps.
+            if self.STEP_RE.match(stripped) and not (
+                    self.HEADER_FIELD_RE is not None and self.HEADER_FIELD_RE.match(stripped)):
+                break
+            if self.starts_ingredients(lines, i):
                 return i
         return len(lines)
 
