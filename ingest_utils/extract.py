@@ -39,7 +39,7 @@ from common.config import EXTRACT_DIR
 
 # Bump when the saved shape or the text rules change, so old saved
 # extractions get rebuilt instead of read.
-EXTRACT_VERSION = 2
+EXTRACT_VERSION = 3
 
 # Typographic ligatures some PDFs store as a single character (Dessert
 # Person stores "Difficulty" as "Difﬁculty" and "flour" as
@@ -59,6 +59,20 @@ LIGATURES = str.maketrans({
     "ʃ": "ff", "ɹ": "fi", "ɻ": "fl", "ɽ": "ffi", "ʀ": "ffl",
 })
 
+# The Food Lab's fonts map its fraction glyphs to accented letters
+# ("ò cup buttermilk", "1ò cups", "ó-inch cubes", "ǩ teaspoon cayenne").
+# Only a letter standing alone (or after a digit) is a fraction: "López"
+# and "ragù" keep theirs. No other book has these letters standalone.
+_FRACTION_GLYPHS = {"ò": "½", "ó": "¼", "ô": "¾", "ǩ": "⅛", "˺": "½"}
+_FRACTION_GLYPH_RE = re.compile(r"(?<![A-Za-zÀ-ÿ])[òóôǩ˺](?![A-Za-zÀ-ÿ])")
+
+
+def _fix_text(text):
+    """Ligatures expanded, mis-mapped fraction glyphs repaired."""
+    text = text.translate(LIGATURES)
+    return _FRACTION_GLYPH_RE.sub(lambda m: _FRACTION_GLYPHS[m.group(0)], text)
+
+
 _BOLD_FONT_RE = re.compile(r"bold|black|heavy|semibold|demi", re.IGNORECASE)
 _ITALIC_FONT_RE = re.compile(r"italic|oblique", re.IGNORECASE)
 
@@ -74,7 +88,7 @@ def _span_style(span):
 
 
 def _line_record(text, spans, bbox, block_no):
-    styled = [(s["text"].translate(LIGATURES), *_span_style(s)) for s in spans if s["text"]]
+    styled = [(_fix_text(s["text"]), *_span_style(s)) for s in spans if s["text"]]
     # The line's style is its span with the most visible characters, so a
     # trailing space in another font doesn't decide it.
     main = max(styled, key=lambda s: len(s[0].strip()), default=("", 0, "", False, False))
@@ -130,7 +144,7 @@ def extract_page_lines(page):
     prev_bottom = None
     for block_no, (_, _, lines) in enumerate(blocks):
         for text, spans, bbox in lines:
-            text = text.translate(LIGATURES)
+            text = _fix_text(text)
             # Matches how ingest always split a page's text into lines:
             # str.splitlines, which also breaks on \r, \x0c,   and a
             # few more, so one PDF line can become several.

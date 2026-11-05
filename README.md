@@ -15,6 +15,7 @@ Currently supported books (each has its own settings in `books/`):
 - *Genius Recipes*
 - *The Complete Cooking For Two Cookbook*
 - *How to Cook Everything Vegetarian*
+- *The Food Lab*
 
 ## What it does
 
