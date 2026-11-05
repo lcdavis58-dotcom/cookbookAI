@@ -25,6 +25,7 @@
     "^(?:[a-z]+\\s+)?but\\s+\\S+\\s+",
     "^pieces?\\s+(?:of\\s+)?",
     "^other\\s+",
+    "^drops?\\s+(?:of\\s+)?",
     "^good[- ]quality\\s+",
     "^/\\s*\\S+\\s+(?:cups?|tablespoons?|teaspoons?|ounces?)\\s+",
     "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",

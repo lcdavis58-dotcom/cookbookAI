@@ -25,6 +25,9 @@ Styles:
                       "¾ cup sugar (5.3 oz / 150g)" (Dessert Person)
     volume_pipe_weight
                       "2⅓ cups | 10½ ounces all-purpose flour" (BraveTart)
+    metric_bracket_volume
+                      "225 g butter" with "[16 tablespoons]" on the next
+                      line, joined on by the book (Momofuku Milk Bar)
 
 Deliberately has nothing to do with the LLM: a book's format is
 consistent enough that a regex parses it reliably, a stronger guarantee
@@ -349,8 +352,64 @@ def volume_pipe_weight(line):
     return None
 
 
+# ---------------------------------------------------------------------------
+# metric_bracket_volume: "225 g butter, at room temperature [16 tablespoons]"
+# ---------------------------------------------------------------------------
+# Momofuku Milk Bar prints the volume on a line of its own under the
+# weighed one; the book module joins that "[...]" line on, so this reads
+#     225 g butter, at room temperature [16 tablespoons (2 sticks)]
+#     300 g mini pretzels [about ¾ (16-ounce) bag (6 cups)]
+#     ½ recipe Cornflake Crunch [180 g (2 cups)]
+#     1 egg
+# The bracket is optional; one that isn't a plain volume ("about ¾ bag")
+# is left in the name's raw text but not read.
+
+_BRACKET_RE = re.compile(r"\s*\[([^\[\]]*)\]\s*$")
+# "190 g graham cracker crumbs 1½ cups]": the PDF lost the "[".
+_UNOPENED_BRACKET_RE = re.compile(rf"\s+((?:about\s+)?{AMOUNT}\s+[^\[\]\d]+)\]\s*$", re.IGNORECASE)
+_METRIC_FIRST_RE = re.compile(rf"^(?P<amt>{AMOUNT})\s*(?P<unit>kg|g|ml|l)\s+(?P<name>\S.*)$", re.IGNORECASE)
+# "[180 g (2 cups)]" under a sub-recipe: its weight.
+_BRACKET_METRIC_RE = re.compile(rf"^(?P<amt>{AMOUNT})\s*(?P<unit>kg|g|ml|l)\b", re.IGNORECASE)
+
+
+def metric_bracket_volume(line):
+    original = line.strip()
+    if not original or NUMBERED_STEP_RE.match(original):
+        return None
+    line, bracket = original, None
+    m = _BRACKET_RE.search(line) or (None if "[" in line else _UNOPENED_BRACKET_RE.search(line))
+    if m:
+        line, bracket = line[:m.start()].strip(), m.group(1).strip()
+
+    volume = None
+    if bracket:
+        volume_m = _VOLUME_RE.match(bracket)
+        if volume_m:
+            volume = _volume(volume_m)
+
+    m = _METRIC_FIRST_RE.match(line)
+    if m:
+        return {**_pipe_result(original, m.group("name"), parse_typed_amount(m.group("amt")),
+                               m.group("unit").lower(), volume),
+                "format": "metric_bracket"}
+    m = _PIPE_COUNT_RE.match(line)
+    if m:
+        amount = parse_typed_amount(m.group("amt"))
+        if amount is None:
+            return None
+        weight = _BRACKET_METRIC_RE.match(bracket) if bracket else None
+        result = {**_pipe_result(original, m.group("name")), "format": "count_only",
+                  "imperial_amount": amount}
+        if weight:
+            result["metric_amount"] = parse_typed_amount(weight.group("amt"))
+            result["metric_unit"] = weight.group("unit").lower()
+        return result
+    return None
+
+
 STYLES = {
     "metric_slash": metric_slash,
     "volume_paren_metric": volume_paren_metric,
     "volume_pipe_weight": volume_pipe_weight,
+    "metric_bracket_volume": metric_bracket_volume,
 }

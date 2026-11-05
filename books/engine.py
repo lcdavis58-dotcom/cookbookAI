@@ -145,7 +145,7 @@ def yield_block_length(lines, i, field_re=None):
     return n
 
 
-def end_of_unmarked_list(lines, start, parse, max_unmeasured_chars, purpose_re):
+def end_of_unmarked_list(lines, start, parse, max_unmeasured_chars, purpose_re, continues=None):
     """Where an ingredient list ends when nothing marks the steps (The
     Cookie Book's plain paragraphs, Savory Baking's few unnumbered
     steps): the first line from start that isn't an ingredient, the wrap
@@ -153,14 +153,17 @@ def end_of_unmarked_list(lines, start, parse, max_unmeasured_chars, purpose_re):
     ALL-CAPS group label. A line with no amount counts as an ingredient
     only when it's short ("Sprinkles, optional") or says what it's for
     (purpose_re); a step's first line runs the width of the column.
-    parse is the book's ingredient parser."""
+    parse is the book's ingredient parser; continues(pending, line), if
+    given, is one more way a line can wrap the ingredient above (Milk
+    Bar's "[2 cups]")."""
     pending = None
     for i in range(start, len(lines)):
         line = lines[i].strip()
         if not line:
             continue
         if pending is not None and (pending.count("(") > pending.count(")")
-                                    or line[:1].islower() or line.startswith("(")):
+                                    or line[:1].islower() or line.startswith("(")
+                                    or (continues is not None and continues(pending, line))):
             pending = f"{pending} {line}"
             continue
         if heading_text(line):

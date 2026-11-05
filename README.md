@@ -10,6 +10,7 @@ Currently supported books (each has its own settings in `books/`):
 - *What's For Dessert*
 - *The Cookie Book*
 - *Savory Baking*
+- *Momofuku Milk Bar*
 
 ## What it does
 

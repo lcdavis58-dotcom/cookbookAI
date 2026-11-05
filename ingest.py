@@ -53,6 +53,7 @@ INGEST_BOOKS = [
     "What's For Dessert",
     "The Cookie Book",
     "Savory Baking",
+    "Momofuku Milk Bar",
 ]
 
 

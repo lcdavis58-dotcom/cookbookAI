@@ -37,7 +37,9 @@ def display_title(title):
     with Ganache", "Dulce de Leche"), and a short word of consonants
     other than y and h ("My", "Sh!t") is an abbreviation kept in
     capitals ("GF", "BBQ")."""
-    if not title.isupper():
+    # All-lowercase titles (Momofuku Milk Bar's "corn cookies") are
+    # title-cased the same way.
+    if not (title.isupper() or title.islower()):
         return title
     titled = re.sub(r"(?<=[’'!])[A-Z]", lambda m: m.group(0).lower(), title.title())
     titled = re.sub(r"(?<=\w-)[A-Z](?![\w’'])", lambda m: m.group(0).lower(), titled)
