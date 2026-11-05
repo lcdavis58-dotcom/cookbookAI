@@ -47,6 +47,9 @@ _NUMBER_WORDS = {
     "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
     "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
 }
+# An item's size: "3-inch", "12- to 16-pound", "28-ounce".
+_SIZE_RE = re.compile(rf"^[\d{FRACTION_CHARS}.]+-?(?:\s*to\s*[\d{FRACTION_CHARS}.]+)?-(?:inch|pound|ounce|quart)\b",
+                      re.IGNORECASE)
 _NUMBER_WORD_RE = re.compile(rf"^({'|'.join(_NUMBER_WORDS)})\b", re.IGNORECASE)
 
 # "Grated zest of 1 lime", "Grated zest and juice of 1 lemon", "Seeds
@@ -112,9 +115,14 @@ def parse_fallback(line, parse):
     m = _NUMBER_WORD_RE.match(line) or _ARTICLE_COUNT_RE.match(line)
     if m:
         number = _NUMBER_WORDS.get(m.group(1).lower(), "1") if m.groups() else "1"
-        parsed = parse(f"{number} {line[m.end():].lstrip()}")
+        rest = line[m.end():].lstrip()
+        parsed = parse(f"{number} {rest}")
         if parsed:
             return {**parsed, "raw": line}
+        # "One 12- to 16-pound (5.4 to 7.3kg) turkey": a count, then the
+        # item's size, which no book parser reads after a number.
+        if _SIZE_RE.match(rest):
+            return _result(line, rest, imperial=float(number))
 
     m = _SIZE_FIRST_RE.match(line)
     if m:

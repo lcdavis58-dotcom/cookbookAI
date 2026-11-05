@@ -28,7 +28,7 @@ STEP_RE = re.compile(r"^\d{1,2}\s+[A-Z]")
 
 # "... baking apples like" / "Honeycrisp or a mix of apples, cored ...":
 # a line left on a word that needs more after it.
-_HANGING_WORD_RE = re.compile(r"\b(?:like|and|or|of|with|plus|such as)$")
+_HANGING_WORD_RE = re.compile(r"\b(?:like|and|or|of|with|plus|such as|into|preferably)$")
 
 
 def is_continuation(pending, last_line, line):

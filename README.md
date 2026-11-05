@@ -12,6 +12,7 @@ Currently supported books (each has its own settings in `books/`):
 - *Savory Baking*
 - *Momofuku Milk Bar*
 - *Genius Desserts*
+- *Genius Recipes*
 
 ## What it does
 

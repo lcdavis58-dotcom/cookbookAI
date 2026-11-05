@@ -26,6 +26,8 @@
     "^pieces?\\s+(?:of\\s+)?",
     "^other\\s+",
     "^drops?\\s+(?:of\\s+)?",
+    "^(?:a\\s+)?(?:dab|splash|squeeze|knob|handful)\\s+of\\s+",
+    "^[\\d½¼¾.]+-?(?:\\s*to\\s*[\\d½¼¾.]+)?-(?:inch|pound|ounce|quart)(?:-thick)?\\s*(?:/\\s*[\\d.]+[- ]?cm\\s*)?\\s(?:(?:pieces?|cans?|bottles?|slices?)\\s+(?:of\\s+)?)?",
     "^good[- ]quality\\s+",
     "^/\\s*\\S+\\s+(?:cups?|tablespoons?|teaspoons?|ounces?)\\s+",
     "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",

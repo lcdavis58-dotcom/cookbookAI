@@ -121,6 +121,7 @@ def section_starts_by_size(headings, consumed):
 # A line left hanging, so the next one continues it: "plus 30-",
 # "DIFFICULTY:", "ACTIVE TIME: 30 minutes |".
 _HANGING_END_RE = re.compile(r"(?:-|\bto|\bplus|,|\(|:|\|)$")
+_COUNTED_SIZE_RE = re.compile(r"^(?:one|two|three|four|five|six|an?)\s+\d", re.IGNORECASE)
 # The ALL-CAPS wrap of an ALL-CAPS yield line opens with a joining word
 # ("INTO LARGE OR SMALL BARS"); a group label right after the yield
 # ("ICE CREAM") doesn't.
@@ -326,6 +327,13 @@ class Profile:
         stripped = lines[i].strip()
         if self.parse_ingredient_line(stripped) or self.section_label(stripped):
             return True
+        # A spelled-out count before a size, which only the fallbacks read
+        # ("One 12- to 16-pound (5.4 to 7.3kg) turkey"). Other fallback
+        # shapes ("about ...") turn up in prose too.
+        if _COUNTED_SIZE_RE.match(stripped):
+            fallback = parse_fallback(stripped, self.parse_ingredient_line)
+            if fallback and not fallback.get("unmeasured"):
+                return True
         if self.BATCH_LABEL_RE is not None and self.BATCH_LABEL_RE.match(stripped):
             return True
         return bool(heading_text(stripped)) and is_component_label(lines, i, self.parse_ingredient_line)

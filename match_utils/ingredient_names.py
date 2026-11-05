@@ -45,7 +45,8 @@ _COMMA_LIST_RE = re.compile(r"^([^,]+(?:,\s*[^,]+?)+),\s*(or|and/or|and)\s+([^,]
 # A prep note among those commas ("vanilla bean, halved lengthwise,
 # seeds scraped out, or 2 teaspoons vanilla extract") means they aren't
 # a list of ingredients.
-_PREP_WORD_RE = re.compile(r"\b(?:[a-z]+ed|cut|torn|split)\b")
+# Not inside a hyphenated name ("oil-cured olives", "sun-dried").
+_PREP_WORD_RE = re.compile(r"(?<!-)\b(?:[a-z]+ed|cut|torn|split)\b")
 # "Oil for frying, see page 189" points at a technique, not a recipe.
 _SEE_PAGE_RE = re.compile(r",?\s*see page\s+\d+")
 # "Golden syrup, such as Lyle's, or light corn syrup": a brand aside,
