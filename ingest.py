@@ -59,6 +59,7 @@ INGEST_BOOKS = [
     "The Complete Cooking For Two Cookbook",
     "How to Cook Everything Vegetarian",
     "The Food Lab",
+    "Salt Fat Acid Heat",
 ]
 
 

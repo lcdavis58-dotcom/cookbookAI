@@ -45,8 +45,8 @@ settings, then add it to both tables below.
 
 from books import (book_on_pie, bravetart, cookie_book, cooking_for_two, dessert_person, fearless_baker,
                    food_lab,
-                   genius_desserts, genius_recipes, htcev, milk_bar, savory_baking,
-                   whats_for_dessert)
+                   genius_desserts, genius_recipes, htcev, milk_bar, salt_fat_acid_heat,
+                   savory_baking, whats_for_dessert)
 from books.engine import Profile
 
 # Lowercased, stripped book title -> strategy name. The title is the one
@@ -68,6 +68,7 @@ RECIPE_AWARE_BOOKS = {
     "the complete cooking for two cookbook": "cooking_for_two",
     "how to cook everything vegetarian": "htcev",
     "the food lab": "food_lab",
+    "salt fat acid heat": "salt_fat_acid_heat",
 }
 
 # Strategy name -> that book's rules: its module, with the shared
@@ -86,6 +87,7 @@ PROFILES = {
     "cooking_for_two": Profile(cooking_for_two),
     "htcev": Profile(htcev),
     "food_lab": Profile(food_lab),
+    "salt_fat_acid_heat": Profile(salt_fat_acid_heat),
 }
 
 

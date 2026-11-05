@@ -48,8 +48,16 @@ _NUMBER_WORDS = {
     "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
 }
 # An item's size: "3-inch", "12- to 16-pound", "28-ounce".
-_SIZE_RE = re.compile(rf"^[\d{FRACTION_CHARS}.]+-?(?:\s*to\s*[\d{FRACTION_CHARS}.]+)?-(?:inch|pound|ounce|quart)\b",
+_SIZE_RE = re.compile(rf"^[\d{FRACTION_CHARS}./]+-?(?:\s*to\s*[\d{FRACTION_CHARS}./]+)?\s?-(?:inch|pound|ounce|quart)\b",
                       re.IGNORECASE)
+# A count in digits before a size: "1 2-pound salmon filet", "2 1-inch
+# strips of lemon zest".
+_DIGIT_COUNT_RE = re.compile(r"^(\d+)\s+(?=\d)")
+_CUT_SHAPE_RE = re.compile(
+    r"(?:-(?:thick|wide|long)\b|\s*/|\s+(?:dice|cubes?|chunks?|pieces?|slices?|rounds?|"
+    r"strips?|matchsticks?|lengths?|thick|wide|long|rectangles?|squares?)\b(?!\s+of\b))", re.IGNORECASE)
+# "Optional: 1-ounce chunk of Parmesan": the rest is the ingredient.
+_OPTIONAL_PREFIX_RE = re.compile(r"^optional:\s*", re.IGNORECASE)
 _NUMBER_WORD_RE = re.compile(rf"^({'|'.join(_NUMBER_WORDS)})\b", re.IGNORECASE)
 
 # "Grated zest of 1 lime", "Grated zest and juice of 1 lemon", "Seeds
@@ -99,6 +107,14 @@ def parse_fallback(line, parse):
     """Read a line the book's parser (parse) rejected, or return None."""
     line = line.strip()
 
+    m = _OPTIONAL_PREFIX_RE.match(line)
+    if m and line[m.end():]:
+        rest = line[m.end():]
+        parsed = parse(rest) or parse_fallback(rest, parse)
+        if parsed:
+            # The name carries the word, so matching treats it as optional.
+            return {**parsed, "raw": line, "name": f"{parsed['name']} (optional)"}
+
     m = _QUALIFIER_RE.match(line)
     if m:
         parsed = parse(line[m.end():])
@@ -129,6 +145,17 @@ def parse_fallback(line, parse):
         parsed = parse(f"1 ({m.group(1)}) {line[m.end():]}")
         if parsed:
             return {**parsed, "raw": line}
+
+    # "1 2-pound salmon filet": a digit count, then the item's size.
+    m = _DIGIT_COUNT_RE.match(line)
+    if m and _SIZE_RE.match(line[m.end():]):
+        return _result(line, line[m.end():], imperial=float(m.group(1)))
+    # "4-pound chicken", "1-inch knob of ginger": a size, so one of them.
+    # Not the wrapped end of a cutting note ("cut into" / "1/2-inch dice",
+    # "1-inch / 2.5-cm-thick rectangle").
+    m = _SIZE_RE.match(line)
+    if m and not _CUT_SHAPE_RE.match(line[m.end():]):
+        return _result(line, line, imperial=1.0)
 
     m = _NAMED_AMOUNT_RE.match(line)
     if m:

@@ -39,7 +39,7 @@ from common.config import EXTRACT_DIR
 
 # Bump when the saved shape or the text rules change, so old saved
 # extractions get rebuilt instead of read.
-EXTRACT_VERSION = 3
+EXTRACT_VERSION = 5
 
 # Typographic ligatures some PDFs store as a single character (Dessert
 # Person stores "Difficulty" as "Difﬁculty" and "flour" as
@@ -67,10 +67,20 @@ _FRACTION_GLYPHS = {"ò": "½", "ó": "¼", "ô": "¾", "ǩ": "⅛", "˺": "½"}
 _FRACTION_GLYPH_RE = re.compile(r"(?<![A-Za-zÀ-ÿ])[òóôǩ˺](?![A-Za-zÀ-ÿ])")
 
 
+# Salt Fat Acid Heat sets its fractions with a space before the slash
+# ("1 /2 cup", "1 1 /2 teaspoons") and before a size's hyphen ("1/2
+# -inch"); no other book has those shapes.
+_SPACED_FRACTION_RE = re.compile(r"(\d) /(\d)")
+_SPACED_SIZE_RE = re.compile(r"(\d) -(?=(?:inch|ounce|pound|quart)\b)")
+
+
 def _fix_text(text):
-    """Ligatures expanded, mis-mapped fraction glyphs repaired."""
+    """Ligatures expanded, mis-mapped fraction glyphs repaired, spaced
+    fractions closed up."""
     text = text.translate(LIGATURES)
-    return _FRACTION_GLYPH_RE.sub(lambda m: _FRACTION_GLYPHS[m.group(0)], text)
+    text = _FRACTION_GLYPH_RE.sub(lambda m: _FRACTION_GLYPHS[m.group(0)], text)
+    text = _SPACED_FRACTION_RE.sub(r"\1/\2", text)
+    return _SPACED_SIZE_RE.sub(r"\1-", text)
 
 
 _BOLD_FONT_RE = re.compile(r"bold|black|heavy|semibold|demi", re.IGNORECASE)
