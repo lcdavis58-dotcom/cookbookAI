@@ -48,6 +48,14 @@ _PURPOSE_RE = re.compile(
     re.IGNORECASE)
 
 
+# Two titles leave out the dish their chapter is about (the book's index
+# prints them the same way), so they're also found by the full name.
+TITLE_ALIASES = {
+    "Favorite Thin and Crispy": ["Favorite Thin and Crispy Chocolate Chip Cookies"],
+    "Spiced Chewy Molasses": ["Spiced Chewy Molasses Cookies"],
+}
+
+
 def ingredient_end(lines, start):
     """Where the steps begin: see books/engine.end_of_unmarked_list."""
     return end_of_unmarked_list(lines, start, _parse, _UNMEASURED_MAX_CHARS, _PURPOSE_RE)

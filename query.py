@@ -7,7 +7,8 @@ Run:
 
 Where things live:
     query_utils/retrieval.py         vector search, split-recipe reassembly
-    query_utils/recipe_matching.py   titles, yield lines, title-word matching
+    query_utils/recipe_matching.py   titles, yield lines
+    query_utils/title_lookup.py      which recipe a question names
 
 Requires the same packages as ingest.py, plus your chat model pulled, e.g.:
     ollama pull llama3.2:1b
@@ -18,9 +19,9 @@ import time
 import ollama
 
 from common import cli
-from query_utils.recipe_matching import (display_title, extract_title,
-                                         find_recipe_header_matches, semantic_top_recipe_guess)
-from query_utils.retrieval import full_recipe_text, retrieve, within_distance
+from query_utils.recipe_matching import extract_title, semantic_top_recipe_guess
+from query_utils.retrieval import candidate_text, retrieve, within_distance
+from query_utils.title_lookup import find_recipes
 
 CHAT_MODEL = "llama3.2:1b"  # or your custom "cookbook-assistant" model
 
@@ -74,12 +75,22 @@ def build_context(hits):
     return "\n\n---\n\n".join(parts)
 
 
+def page_note(candidate):
+    entry = candidate.payload
+    return f"p.{entry['page']}" if entry.get("page_confirmed") else "page unknown"
+
+
 def ask(question):
-    # Title matching looks at every retrieved hit, however far; only the
+    # Title lookup searches every recipe in the recipe index; only the
     # LLM fallback below is limited to hits within MAX_DISTANCE.
     hits = retrieve(question)
     relevant = within_distance(hits)
-    header_matches = find_recipe_header_matches(hits, question)
+    found, source = find_recipes(question, hits)
+    # Only a title the question names in full is shown directly. A near
+    # miss ("partial") goes to the model with the closest chunks, since a
+    # question can mention a dish in passing ("what goes with banana
+    # bread?") without asking for that recipe.
+    header_matches = found.matches if found.kind == "match" else []
 
     # Diagnostic comparison, not used for the actual decision below.
     # Prints what a pure-embedding-distance approach would have guessed,
@@ -89,27 +100,34 @@ def ask(question):
         semantic_guess = semantic_top_recipe_guess(relevant)
         semantic_title = (extract_title(semantic_guess["text"], semantic_guess["book"])
                           if semantic_guess else "(too close to call)")
-        word_match_titles = [extract_title(h["text"], h["book"]) for h in header_matches]
-        print(f"[debug] semantic-only guess: {semantic_title}  |  "
-              f"title-word match(es): {word_match_titles or '(none)'}")
+        print(f"[debug] semantic-only guess: {semantic_title}  |  title lookup in the {source}: "
+              f"{found.kind} {[c.title for c in found.matches] or ''}, typos read as {found.typos or '(none)'}, "
+              f"books named: {found.books or '(none)'}")
 
     if len(header_matches) == 1:
-        h = header_matches[0]
-        page_label = f"p.{h['page']}" if h["page_confirmed"] else "page unknown"
-        print(f"Found this directly in {h['book']} ({page_label}), showing the exact text:\n")
-        print(full_recipe_text(h))
-        print(f"\n(matched instantly, no generation needed, distance {h['distance']:.1f})")
-        return
+        c = header_matches[0]
+        text = candidate_text(c)
+        if text:
+            print(f"Found this directly in {c.book} ({page_note(c)}), showing the exact text:\n")
+            print(text)
+            print("\n(matched instantly, no generation needed)")
+            return
+        print(f"[warning] '{c.title}' is in the recipe index but not the database; "
+              f"run tools/build_recipe_index.py to update the index.\n")
 
     if len(header_matches) > 1:
-        print(f"I found {len(header_matches)} recipes matching \"{question}\". Which one did you mean?\n")
-        for i, h in enumerate(header_matches, 1):
-            title = display_title(extract_title(h["text"], h["book"]))
-            page_label = f"p.{h['page']}" if h["page_confirmed"] else "page unknown"
-            print(f"  {i}. {title}  ({h['book']}, {page_label})")
-        example_title = extract_title(header_matches[0]["text"], header_matches[0]["book"]).lower()
-        print(f"\nRun again with a more specific name to see the full recipe, e.g.:")
-        print(f'  python3 query.py "recipe for {example_title}"')
+        total = len(header_matches) + found.more
+        print(f"I found {total} recipes matching \"{question}\". Which one did you mean?\n")
+        for i, c in enumerate(header_matches, 1):
+            print(f"  {i}. {c.title}  ({c.book}, {page_note(c)})")
+        if found.more:
+            print(f"  ...and {found.more} more.")
+        first = header_matches[0]
+        # The same name in two books: naming the book picks one.
+        same_name = sum(c.title.lower() == first.title.lower() for c in header_matches) > 1
+        example = f"{first.title.lower()} from {first.book}" if same_name else first.title.lower()
+        print("\nRun again with a more specific name (or the book's name) to see the full recipe, e.g.:")
+        print(f'  python3 query.py "recipe for {example}"')
         print("\n(matched instantly, no generation needed)")
         return
 

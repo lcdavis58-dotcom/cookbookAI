@@ -11,16 +11,14 @@ from common import cli
 from common.config import CHROMA_PATH, COLLECTION_NAME
 from common.embeddings import embed_query
 
-# Two different K values for two different jobs. TITLE_SEARCH_K needs to be
-# generous, since finding every distinct recipe that could match a vague
-# query ("whipped cream") requires seeing enough candidates to notice all
-# of them, this is cheap (plain vector search, no generation) so a wide net
-# costs almost nothing. query.LLM_CONTEXT_K stays small, that's how many
-# chunks actually get pasted into a prompt if we fall through to
+# Two different K values for two different jobs. Title lookup
+# (query_utils/title_lookup.py) searches every title in the recipe index
+# and only uses these hits to order equally good titles, or as the titles
+# to search when the index hasn't been built; that fallback is why
+# TITLE_SEARCH_K stays generous (plain vector search, no generation, so a
+# wide net costs almost nothing). query.LLM_CONTEXT_K stays small, that's
+# how many chunks actually get pasted into a prompt if we fall through to
 # generation, and a bigger prompt directly costs more time on the Pi's CPU.
-# As more books get ingested, TITLE_SEARCH_K is the first thing to raise,
-# a broader library means more same-named or similar-sounding recipes
-# competing for the same top-K slots.
 TITLE_SEARCH_K = 20
 
 # Based on real data from this book: relevant whipped cream chunks topped
@@ -30,9 +28,8 @@ TITLE_SEARCH_K = 20
 # keep their components, Classic Whipped Cream came in at 247 for "double
 # the classic whipped cream". So it only decides what's close enough to
 # hand to the model (within_distance), never whether a recipe named in
-# the question is found: title matching (query_utils/recipe_matching.py)
-# looks at every retrieved hit, however far, because requiring every
-# title word in the question is already a strong check on its own.
+# the question is found: title lookup (query_utils/title_lookup.py) never
+# looks at distance.
 MAX_DISTANCE = 240
 
 
@@ -112,3 +109,25 @@ def full_recipe_text(hit):
         print(f"[warning] expected {hit['part_count']} parts for {hit['recipe_id']}, "
               f"found {len(parts)}, the recipe below may be incomplete. Re-ingest this book.")
     return "\n".join(doc for _, doc in parts)
+
+
+def recipe_text_by_id(recipe_id):
+    """The complete text of a stored recipe, by its recipe_id (or, for a
+    chunk ingested before recipe_id existed, its chunk id, which is what
+    the recipe index uses then). "" when it isn't in the database, which
+    means the recipe index is out of date."""
+    collection = get_collection()
+    result = collection.get(where={"recipe_id": recipe_id})
+    if not result["ids"]:
+        result = collection.get(ids=[recipe_id])
+    parts = sorted(zip(result["metadatas"], result["documents"]), key=lambda p: p[0].get("part", 0))
+    return "\n".join(doc for _, doc in parts)
+
+
+def candidate_text(candidate):
+    """The complete text of a recipe found by query_utils/title_lookup:
+    from its retrieved chunk, or by its recipe_id for one found in the
+    recipe index."""
+    if "text" in candidate.payload:
+        return full_recipe_text(candidate.payload)
+    return recipe_text_by_id(candidate.key)

@@ -22,7 +22,7 @@ Currently supported books (each has its own settings in `books/`):
 
 ## What it does
 
-**Ask about a recipe** (`query.py`): finds a recipe by its title or by semantic search, and answers using only the text of your books, with book and page citations.
+**Ask about a recipe** (`query.py`): finds a recipe by its title (forgiving of plurals, accents, typos and filler words; add "from <book>" to pick a book, misspelled, shortened or as an acronym like "sfah") or by semantic search, and answers using only the text of your books, with book and page citations.
 
 ```
 python3 query.py "What page has the recipe for sweet tart dough?"
@@ -83,14 +83,14 @@ Run every script from `app/`.
 | Path | Purpose |
 |---|---|
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
-| `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title matching |
+| `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest), matching |
 | `books/` | Per-book settings, the shared engine that applies them, and ingredient line styles |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
 | `tools/` | Maintenance scripts; `tools/diagnostics/` for seeing how ingest and the parsers read a book |
-| `testing/` | Tests to come, and a local-only scratch folder (see `testing/README.md`) |
+| `testing/` | Unit tests (`python3 -m unittest discover testing`) and a local-only scratch folder (see `testing/README.md`) |
 
 ## Adding a book
 
@@ -100,9 +100,7 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- Add the remaining books
 - Check sub-recipes when matching ingredients (a recipe that calls for "1 recipe Brioche Dough" also needs that recipe's ingredients), designed once every book's way of referring to its own recipes is known
-- Forgiving recipe title lookup for scaling ("chocolate chip cookies" finding "Chocolate Chip Cookie")
 - Move from the Raspberry Pi to a GPU machine
 - A locally hosted web interface for household use
 

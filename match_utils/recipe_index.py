@@ -9,8 +9,11 @@ does, so a parser change only needs the index rebuilt, not a re-ingest
 (re-embedding is the slow part on the Pi).
 
 Entry shape:
-    recipe_id, book, title, title_words (for title lookup), page,
-    page_confirmed,
+    recipe_id, book, title,
+    match_title   the title without a "with ..." tail, and
+    aliases       extra titles from the book's TITLE_ALIASES, both for
+                  title lookup (query_utils/title_lookup.py)
+    page, page_confirmed,
     ingredients   required ingredients, each {"name": the normalized
                   name, for display ("unsalted butter or shortening"),
                   "options": the names that satisfy it (["unsalted
@@ -26,10 +29,9 @@ Entry shape:
 
 import json
 import os
-import string
 from collections import defaultdict
 
-from books import strategy_for
+from books import profile_for_book, strategy_for
 from common.config import RECIPE_INDEX_PATH
 from match_utils.ingredient_names import normalize, options, pieces
 from query_utils.recipe_matching import display_title, extract_title
@@ -106,12 +108,13 @@ def index_entry(recipe_id, recipe):
     required_names = {entry["name"] for entry in required}
     optional = [entry for entry in optional if entry["name"] not in required_names]
 
-    match_title = extract_title(text, book, include_subtitle=False) or ""
+    printed_title = extract_title(text, book) or ""
     return {
         "recipe_id": recipe_id,
         "book": book,
-        "title": display_title(extract_title(text, book) or recipe_id),
-        "title_words": [w for w in (w.strip(string.punctuation).lower() for w in match_title.split()) if w],
+        "title": display_title(printed_title or recipe_id),
+        "match_title": extract_title(text, book, include_subtitle=False) or "",
+        "aliases": profile_for_book(book).title_aliases(printed_title),
         "page": recipe["page"],
         "page_confirmed": recipe["page_confirmed"],
         "ingredients": required,

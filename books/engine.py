@@ -232,6 +232,12 @@ class Profile:
                               recipe that end the ingredient list, like the
                               shared DO AHEAD / NOTES / VARIATIONS
                               (scale_utils/ingredients.py)
+        TITLE_ALIASES         printed title -> list of extra titles to
+                              find the recipe by, for titles that leave
+                              out what the chapter supplies (The Cookie
+                              Book's "Favorite Thin and Crispy", in the
+                              chocolate chip chapter). Stored in the
+                              recipe index; see query_utils/title_lookup.py
     """
 
     TITLE_ITALIC = False
@@ -245,6 +251,7 @@ class Profile:
     HEADER_FIELD_RE = None
     INGREDIENTS_AFTER_RE = None
     INGREDIENTS_RIGHT_AFTER = False
+    TITLE_ALIASES = {}
 
     def __init__(self, module):
         self.module = module
@@ -298,6 +305,14 @@ class Profile:
         if len(lines) > 1 and _SUBTITLE_RE.match(lines[1]):
             title = f"{title} {lines[1]}"
         return title
+
+    def title_aliases(self, title):
+        """The extra titles TITLE_ALIASES gives a recipe, looked up by its
+        printed title regardless of case and spacing (the book prints
+        "FAVORITE THIN AND CRISPY")."""
+        key = " ".join((title or "").lower().split())
+        return [alias for printed, aliases in self.TITLE_ALIASES.items()
+                if " ".join(printed.lower().split()) == key for alias in aliases]
 
     def ingredient_start(self, lines):
         """Where the ingredient list begins: after the yield block (or the

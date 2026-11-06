@@ -8,7 +8,8 @@ Run:
     python3 scale.py -d "double the sweet tart dough"    # with debug output
 
 Where things live:
-    query_utils/                     finding the recipe (shared with query.py)
+    query_utils/                     finding the recipe (shared with query.py),
+                                     by title in query_utils/title_lookup.py
     scale_utils/ingredients.py       ingredient list -> groups (all books)
     books/<book>.py           each book's ingredient line format
     scale_utils/recipe_scaling.py    scale factor from the request, the math
@@ -22,9 +23,9 @@ supports tool calling (llama3.2:1b does).
 
 from common import cli
 from books import strategy_for
-from query_utils.recipe_matching import (display_title, extract_title, extract_yield_line,
-                                         find_recipe_header_matches)
-from query_utils.retrieval import full_recipe_text, retrieve, within_distance
+from query_utils.recipe_matching import display_title, extract_title, extract_yield_line
+from query_utils.retrieval import candidate_text, retrieve, within_distance
+from query_utils.title_lookup import find_recipes
 from scale_utils.ingredients import extract_ingredient_groups, pick_default_batch
 from scale_utils.measurement_display import count_unit_label, format_imperial_amount, to_teaspoons
 from scale_utils.pan_scaling import detect_pan_request, pan_scale_factor_from_question
@@ -92,29 +93,57 @@ def print_scaled_ingredient(ing):
         print(f"      {marker} {note}")
 
 
+def print_choices(found):
+    for i, c in enumerate(found.matches, 1):
+        print(f"  {i}. {c.title}  ({c.book})")
+    if found.more:
+        print(f"  ...and {found.more} more. Add more of the recipe's name to narrow it down.")
+    if len({c.book for c in found.matches}) > 1:
+        print(f'\nNaming the book picks between them, e.g. '
+              f'"... the {found.matches[0].title.lower()} from {found.matches[0].book}".')
+
+
 def scale_recipe(question):
     hits = retrieve(question)
-    header_matches = find_recipe_header_matches(hits, question)
+    found, source = find_recipes(question, hits)
+    if cli.DEBUG:
+        print(f"[debug] title lookup in the {source}: {found.kind}, "
+              f"{len(found.matches) + found.more} title(s), typos read as {found.typos or '(none)'}, "
+              f"books named: {found.books or '(none)'}")
 
-    if not header_matches:
+    if found.kind == "none":
+        if found.books:
+            print(f"I couldn't find a recipe by that name in {' or '.join(found.books)}.")
+            print("Check the recipe's name, or leave the book out to search every book.")
+            return
         if not within_distance(hits):
             print("I couldn't find anything relevant to that in your cookbooks.")
             return
         print("I couldn't identify a specific recipe to scale from your request.")
-        print('Try including the exact recipe name, e.g. "double the classic whipped cream recipe".')
+        print('Try including the recipe name, e.g. "double the classic whipped cream recipe".')
         return
 
-    if len(header_matches) > 1:
-        print(f"I found {len(header_matches)} recipes matching your request. Which one did you mean?\n")
-        for i, h in enumerate(header_matches, 1):
-            print(f"  {i}. {display_title(extract_title(h['text'], h['book']))}")
+    if found.kind == "partial":
+        print("I couldn't find a recipe by exactly that name. Did you mean one of these?\n")
+        print_choices(found)
+        print("\nRun again using one of these names.")
         return
 
-    match = header_matches[0]
-    recipe_text = full_recipe_text(match)
-    title = display_title(extract_title(recipe_text, match["book"]))
+    if len(found.matches) > 1:
+        total = len(found.matches) + found.more
+        print(f"I found {total} recipes matching your request. Which one did you mean?\n")
+        print_choices(found)
+        return
 
-    strategy = strategy_for(match["book"])
+    match = found.matches[0]
+    recipe_text = candidate_text(match)
+    if not recipe_text:
+        print(f"Found '{match.title}' in the recipe index, but it isn't in the database. "
+              f"The index is out of date: run tools/build_recipe_index.py.")
+        return
+    title = display_title(extract_title(recipe_text, match.book))
+
+    strategy = strategy_for(match.book)
     groups = extract_ingredient_groups(recipe_text, strategy)
 
     if cli.DEBUG:
@@ -152,7 +181,7 @@ def scale_recipe(question):
         return
 
     yield_line = extract_yield_line(recipe_text)
-    print(f"Scaling '{title}'{batch_note}...\n")
+    print(f"Scaling '{title}'{batch_note} from {match.book}...\n")
 
     # Try deterministic pre-checks first, in order of how unambiguous
     # they are. Unambiguous multiplier phrasing ("double", "3x") and
