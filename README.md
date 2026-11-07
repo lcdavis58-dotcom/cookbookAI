@@ -58,6 +58,7 @@ Expected layout:
 CookbookAI/
 ├── app/          <- this repository
 ├── chroma_db/    <- created by ingest.py
+├── chats/        <- saved chats, one file each (CHATS_DIR overrides it)
 ├── extracted/    <- saved PDF extractions, created by ingest.py
 └── cookbooks/    <- your PDFs (not included)
 ```
@@ -84,6 +85,7 @@ Run every script from `app/`.
 |---|---|
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `actions/` | What `query.py`, `scale.py` and `match.py` do, each returning its result as data plus the text the command line prints; the scripts are thin wrappers |
+| `chat/` | What a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer) and saving it to `chats/` |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest, with sub-recipe links), matching |

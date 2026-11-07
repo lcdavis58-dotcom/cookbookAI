@@ -19,6 +19,9 @@ RECIPE_INDEX_PATH = os.path.join(PROJECT_ROOT, "..", "recipe_index.json")
 # Saved PDF extractions (ingest_utils/extract.py). They quote the books,
 # so like chroma_db they live outside app/; EXTRACT_DIR overrides it.
 EXTRACT_DIR = os.environ.get("EXTRACT_DIR", os.path.join(PROJECT_ROOT, "..", "extracted"))
+# Saved chats (chat/store.py), one file each, in a folder of their own
+# so nothing else ends up mixed in with them. CHATS_DIR overrides it.
+CHATS_DIR = os.environ.get("CHATS_DIR", os.path.join(PROJECT_ROOT, "..", "chats"))
 COLLECTION_NAME = "cookbooks"
 EMBED_MODEL = "nomic-embed-text"
 
