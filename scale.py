@@ -18,8 +18,8 @@ Where things live:
     scale_utils/measurement_display.py  amounts -> real measuring tools
     scale_utils/scaling_rules.py     non-scalable / storage-sensitive notes
 
-Requires the same packages/models as query.py, plus a chat model that
-supports tool calling (llama3.2:1b does).
+Requires the same packages and chat model as query.py (the model must
+support tool calling, as qwen2.5:7b does).
 """
 
 from actions import scale

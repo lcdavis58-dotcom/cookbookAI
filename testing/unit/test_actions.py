@@ -114,10 +114,55 @@ class ScaleRecipeTest(unittest.TestCase):
     """scale_recipe on made-up recipes, with the database and model
     patched out."""
 
-    def scale(self, text, question, intent=None):
+    def scale(self, text, question, intent=None, **options):
         with mock.patch.object(scale, "candidate_text", return_value=text), \
              mock.patch.object(scale, "determine_scale_intent", return_value=(intent, 0.1)):
-            return scale.scale_recipe(candidate("Test"), question)
+            return scale.scale_recipe(candidate("Test"), question, **options)
+
+    def test_a_multiplier_builds_on_the_base(self):
+        result = self.scale(TWO_CREAMS, "now halve it", base=2.0)
+        self.assertEqual(result.factor, 1.0)
+        self.assertEqual(result.explanation, "0.5x the 2x version = 1x the recipe as written")
+        intent = {"basis": "direct", "direct_multiplier": 1.5}
+        self.assertEqual(self.scale(TWO_CREAMS, "make it 50% bigger", intent, base=2.0).factor, 3.0)
+
+    def test_a_weight_yield_is_not_servings(self):
+        # TWO_CREAMS "MAKES 1 CUP": "for 12 people" can't be read from it.
+        intent = {"basis": "yield", "target_yield": 12, "original_yield": 1}
+        result = self.scale(TWO_CREAMS, "scale it for 12 people", intent)
+        self.assertEqual((result.kind, result.problem), ("no_factor", "unresolved"))
+        self.assertIn("isn't a number of servings", result.explanation)
+        # Unless she says what it makes herself.
+        intent = {"basis": "yield", "target_yield": 3, "original_yield": 1}
+        self.assertEqual(self.scale(TWO_CREAMS, "this makes 1 cup, I need 3", intent).factor, 3.0)
+
+    def test_a_made_up_yield_is_refused(self):
+        intent = {"basis": "yield", "target_yield": 12, "original_yield": 13}
+        result = self.scale(TWO_CREAMS, "scale it for 12 people", intent)
+        self.assertIn("couldn't find how much the recipe makes", result.explanation)
+
+    def test_a_target_ignores_the_base(self):
+        intent = {"basis": "ingredient_constraint", "reference_ingredient": "heavy cream",
+                  "target_ingredient_amount": 470}
+        result = self.scale(TWO_CREAMS, "I only have 470 g of heavy cream", intent, base=3.0)
+        self.assertEqual(result.factor, 2.0)
+
+    def test_too_far_from_the_base(self):
+        result = self.scale(TWO_CREAMS, "triple it", base=10.0)
+        self.assertEqual((result.kind, result.problem), ("no_factor", "unresolved"))
+
+    def test_chosen_batch_and_kept_factor(self):
+        result = self.scale(BATCHED, "the small one", batch="small", factor=3.0, explanation="Small Batch at 3x")
+        self.assertEqual((result.kind, result.batch, result.factor), ("scaled", "Small Batch", 3.0))
+        self.assertEqual(result.sections[0].ingredients[0]["scaled_metric"], 300)
+        self.assertEqual(result.explanation, "Small Batch at 3x")
+
+    def test_title_multipliers_are_not_requests(self):
+        cake = candidate("Double Chocolate Cake")
+        self.assertEqual(scale.without_title_multipliers("scale the double chocolate cake for 12", cake),
+                         "scale the chocolate cake for 12")
+        self.assertEqual(scale.without_title_multipliers("double the double chocolate cake", cake),
+                         "the double chocolate cake")
 
     def test_direct_multiplier(self):
         result = self.scale(TWO_CREAMS, "double it")

@@ -13,7 +13,7 @@ Division of labor, deliberately:
     without ever calling the model.
 
 A further refinement, learned from testing: even the "which basis"
-classification isn't fully reliable from a 1B model, it can populate
+classification wasn't fully reliable from a 1B model, it could populate
 fields from multiple bases at once, none of them coherent (see
 detect_direct_multiplier below). Where a pattern is unambiguous and
 regular enough to catch with a plain regex, do that BEFORE ever
@@ -22,13 +22,10 @@ get the easy case right.
 """
 
 import re
-import time
-import ollama
 
+from common import models
 from common.word_list_loader import load_universal
 from scale_utils.scaling_rules import check_ingredient_flags
-
-CHAT_MODEL = "qwen2.5:7b"
 
 SCALE_INTENT_TOOL = {
     "type": "function",
@@ -67,7 +64,13 @@ SCALE_INTENT_TOOL = {
                 },
                 "original_yield": {
                     "type": "number",
-                    "description": "The recipe's own stated yield, read directly from the provided yield line, if basis is 'yield'. Omit otherwise.",
+                    "description": (
+                        "The recipe's original yield, if basis is 'yield': the number the user gives for "
+                        "it, if they give one ('it feeds 6, I need 10' -> 6); otherwise read from the "
+                        "stated yield line, but only when it counts the same thing as the target (servings, "
+                        "people, pieces). If the yield line only gives a weight or volume (grams, cups) and "
+                        "the user asks for people or servings, omit this. Omit otherwise."
+                    ),
                 },
                 "reference_ingredient": {
                     "type": "string",
@@ -89,8 +92,7 @@ def determine_scale_intent(question, recipe_title, yield_line, ingredients):
     (arguments_dict, elapsed_seconds), or (None, elapsed_seconds) if the
     model didn't use the tool. Timing is returned regardless of outcome,
     since "how long did that take" matters as much as "did it work" when
-    comparing models, especially with model choice now a live variable
-    (CHAT_MODEL can be swapped independently of query.py's chat model).
+    comparing models (CHAT_MODEL in common/config.py).
     """
     ingredient_list_text = "\n".join(
         f"- {ing['name']}: as needed" if ing.get("unmeasured") else
@@ -117,9 +119,8 @@ def determine_scale_intent(question, recipe_title, yield_line, ingredients):
         f"User request: {question}"
     )
 
-    t0 = time.time()
-    response = ollama.chat(
-        model=CHAT_MODEL,
+    response, elapsed = models.chat(
+        "scale intent",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -127,7 +128,6 @@ def determine_scale_intent(question, recipe_title, yield_line, ingredients):
         tools=[SCALE_INTENT_TOOL],
         options={"temperature": 0.1},
     )
-    elapsed = time.time() - t0
 
     tool_calls = response["message"].get("tool_calls")
     if not tool_calls:
@@ -224,12 +224,35 @@ def _check_sane(factor, explanation):
     return factor, explanation
 
 
-def resolve_scale_factor(intent, ingredients):
+_MEASURE_UNIT = r"(?:g|grams?|kg|ml|milliliters?|l|liters?|cups?|oz|ounces?|pounds?|lbs?|quarts?|pints?|" \
+                r"tablespoons?|teaspoons?|tbsp|tsp)"
+_NUM = r"\d+(?:[./]\d+)?[½¼¾⅓⅔]?"
+# A run of numbers ("141, 283, or 422") followed by a weight or volume.
+_MEASURE_RUN_RE = re.compile(rf"({_NUM}(?:\s*(?:,\s*)?(?:or|to|and|-|–|,)\s*{_NUM})*)\s*{_MEASURE_UNIT}\b",
+                             re.IGNORECASE)
+_NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
+
+
+def yield_measure_numbers(yield_line):
+    """The numbers in a yield line that are weights or volumes, not
+    counts: 141, 283 and 422 in "MAKES 141, 283, OR 422 G / 1, 3, OR 4
+    CUPS", but not 6 in "Serves 6"."""
+    numbers = set()
+    for m in _MEASURE_RUN_RE.finditer(yield_line or ""):
+        numbers.update(float(n) for n in _NUMBER_RE.findall(m.group(1)))
+    return numbers
+
+
+def resolve_scale_factor(intent, ingredients, yield_line="", question=""):
     """Deterministically turn the model's reported intent into an actual
     scale factor. Returns (factor, explanation) on success,
     (None, reason) if it can't be resolved, or
     ("ambiguous", [candidate_names]) if an ingredient reference matched
     more than one parsed ingredient and needs disambiguation.
+
+    With the yield line and the request, a yield the model read from a
+    weight or volume ("141 g") that the request didn't state itself is
+    refused: scaling grams of whipped cream to "12 people" is a guess.
     """
     basis = normalize_basis(intent)
 
@@ -247,6 +270,18 @@ def resolve_scale_factor(intent, ingredients):
     if basis == "yield":
         target = intent.get("target_yield")
         original = intent.get("original_yield")
+        stated = {float(n) for n in _NUMBER_RE.findall(question or "")}
+        in_line = {float(n) for n in _NUMBER_RE.findall(yield_line or "")}
+        if re.search(r"\bdozen\b", yield_line or "", re.IGNORECASE):
+            in_line |= {12 * n for n in in_line} | {12.0}
+        # A yield neither the recipe nor she stated was made up.
+        if original and yield_line and original not in in_line | stated:
+            return None, (f"I couldn't find how much the recipe makes (read it as {original:g}, which isn't in "
+                          f'"{yield_line.strip()}"). Try a multiplier ("double it") or how much of one ingredient '
+                          f"you have")
+        if target and (not original or (original in yield_measure_numbers(yield_line) and original not in stated)):
+            return None, ("the recipe's yield isn't a number of servings or pieces, so I can't scale it to "
+                          f"{target:g}. Try a multiplier (\"double it\") or how much of one ingredient you have")
         if not target or not original:
             return None, "Missing target or original yield"
         factor = target / original

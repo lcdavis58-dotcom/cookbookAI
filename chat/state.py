@@ -75,8 +75,9 @@ class Numbered:
 @dataclass
 class Pending:
     """A question the chat asked. kind is "pick_recipe" (the choices are
-    focus.numbered) or "pick_batch" (options are the batch names, for
-    focus.recipe). request is the message the question is about."""
+    focus.numbered), "pick_batch" (options are the batch names, for
+    focus.recipe) or "need_recipe" (a request like "double it" with no
+    recipe to apply it to). request is the message the question is about."""
     kind: str
     action: str
     request: str
@@ -104,6 +105,10 @@ class Turn:
     text: str                       # as shown
     at: str
     action: str = None              # the action that produced a reply
+    route: str = None               # how the message was routed ("rule: scale current")
+    # common/models.CALLS for the reply: {"job", "model", "seconds"} each,
+    # read by tools/diagnostics/model_timing.py.
+    model_calls: list = field(default_factory=list)
 
 
 @dataclass
@@ -126,8 +131,8 @@ class ChatState:
             self.title = short_title(text)
         self.updated = self.messages[-1].at
 
-    def add_reply(self, text, action=None):
-        self.messages.append(Turn("assistant", text, now(), action))
+    def add_reply(self, text, action=None, route=None, model_calls=()):
+        self.messages.append(Turn("assistant", text, now(), action, route, list(model_calls)))
         self.updated = self.messages[-1].at
 
     def unanswered(self):

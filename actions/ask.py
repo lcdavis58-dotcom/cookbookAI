@@ -4,17 +4,12 @@ as the book's exact text; several are listed to pick from; anything else
 goes to the model with the closest book excerpts. See query.py.
 """
 
-import time
 from dataclasses import dataclass, field
 
-import ollama
-
-from common import cli
+from common import cli, models
 from query_utils.recipe_matching import extract_title, semantic_top_recipe_guess
 from query_utils.retrieval import candidate_text, retrieve, within_distance
 from query_utils.title_lookup import find_recipes
-
-CHAT_MODEL = "llama3.2:1b"  # or your custom "cookbook-assistant" model
 
 # How many of the retrieved chunks get pasted into the prompt if we fall
 # through to generation. Kept small, a bigger prompt directly costs more
@@ -62,7 +57,8 @@ class AskResult:
         "choices"   it names several: choices (best first, at most
                     title_lookup.MAX_LISTED), more (how many past those)
         "answer"    the model answered from the closest excerpts: answer,
-                    sources (the hits it was given), generation_time
+                    sources (the hits it was given), generation_time;
+                    from about(), recipe is the one recipe it was given
         "nothing"   nothing in the books is close to the question
     warnings are problems worth showing whatever the kind (a recipe in the
     index but not the database)."""
@@ -124,8 +120,7 @@ def run(question):
         text = candidate_text(c)
         if text:
             return AskResult("recipe", question, recipe=c, text=text)
-        warnings.append(f"[warning] '{c.title}' is in the recipe index but not the database; "
-                        f"run tools/build_recipe_index.py to update the index.")
+        warnings.append(_stale(c))
 
     if len(header_matches) > 1:
         return AskResult("choices", question, choices=header_matches, more=found.more)
@@ -141,17 +136,50 @@ def run(question):
     context = build_context(llm_hits)
     user_prompt = f"Cookbook excerpts:\n\n{context}\n\nQuestion: {question}"
 
-    t0 = time.time()
-    response = ollama.chat(
-        model=CHAT_MODEL,
+    answer, seconds = _answer(user_prompt)
+    return AskResult("answer", question, answer=answer, sources=llm_hits,
+                     generation_time=seconds, warnings=warnings)
+
+
+def _answer(user_prompt):
+    response, seconds = models.chat(
+        "answer",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
-        options={"temperature": 0.2, "num_ctx": 2048},
+        options={"temperature": 0.2},
     )
-    return AskResult("answer", question, answer=response["message"]["content"], sources=llm_hits,
-                     generation_time=time.time() - t0, warnings=warnings)
+    return response["message"]["content"], seconds
+
+
+def _stale(candidate):
+    return (f"[warning] '{candidate.title}' is in the recipe index but not the database; "
+            f"run tools/build_recipe_index.py to update the index.")
+
+
+def show(candidate, question=""):
+    """A recipe that's already been found (picked from a list, say),
+    shown as the book's exact text."""
+    text = candidate_text(candidate)
+    if text:
+        return AskResult("recipe", question, recipe=candidate, text=text)
+    return AskResult("nothing", question, warnings=[_stale(candidate)])
+
+
+def about(candidate, question):
+    """A question about one recipe ("how long does it chill?"),
+    answered by the model from that recipe's text alone."""
+    text = candidate_text(candidate)
+    if not text:
+        return AskResult("nothing", question, warnings=[_stale(candidate)])
+    entry = candidate.payload or {}
+    source = {"book": candidate.book, "page": entry.get("page", 0),
+              "page_confirmed": entry.get("page_confirmed", False), "distance": 0.0, "text": text}
+    answer, seconds = _answer(f"Cookbook excerpts:\n\n{build_context([source])}\n\n"
+                              f"Question (about {candidate.title}): {question}")
+    return AskResult("answer", question, recipe=candidate, answer=answer, sources=[source],
+                     generation_time=seconds)
 
 
 def render(result):

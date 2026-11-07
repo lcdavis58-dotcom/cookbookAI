@@ -49,7 +49,7 @@ Add `-d` to any of these commands for debug output.
 ```
 pip install pymupdf chromadb ollama
 ollama pull nomic-embed-text
-ollama pull llama3.2:1b        # or a larger chat model, see below
+ollama pull qwen2.5:7b         # the chat model, see below
 ```
 
 Expected layout:
@@ -63,7 +63,7 @@ CookbookAI/
 └── cookbooks/    <- your PDFs (not included)
 ```
 
-Book titles and PDF filenames are in `BOOK_FILES` in `common/config.py`, and the books to ingest in `INGEST_BOOKS` in `ingest.py`. To keep the PDFs or the extractions somewhere else, set the `COOKBOOKS_DIR` or `EXTRACT_DIR` environment variable. Then:
+Book titles and PDF filenames are in `BOOK_FILES` in `common/config.py`, and the books to ingest in `INGEST_BOOKS` in `ingest.py`. To keep the PDFs somewhere else, set the `COOKBOOKS_DIR` environment variable. `COOKBOOK_DATA_DIR` moves everything the app writes (`chroma_db/`, `recipe_index.json`, `chats/`, `extracted/`) to another folder; keep it out of a synced folder like OneDrive or Dropbox, which would keep re-uploading a live database. `EXTRACT_DIR` and `CHATS_DIR` move just those. Then:
 
 ```
 python3 ingest.py               # build or update the database
@@ -77,7 +77,9 @@ Run every script from `app/`.
 
 ### Models
 
-`llama3.2:1b` is fast enough to run on a Raspberry Pi's CPU. `qwen2.5:7b` is much more accurate for scaling, but slow without a GPU.
+One chat model, `CHAT_MODEL` in `common/config.py` (`qwen2.5:7b`), does every model job: answering questions, reading scaling requests, and routing chat messages. Set the `CHAT_MODEL` environment variable to try another. It's slow on a Raspberry Pi's CPU; most common requests are handled by plain rules and never reach it.
+
+Every chat reply saves how long each model call took, and `tools/diagnostics/model_timing.py` summarizes them per model and job, for comparing a larger model's accuracy against its wait.
 
 ## Project layout
 
@@ -85,7 +87,7 @@ Run every script from `app/`.
 |---|---|
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `actions/` | What `query.py`, `scale.py` and `match.py` do, each returning its result as data plus the text the command line prints; the scripts are thin wrappers |
-| `chat/` | What a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer) and saving it to `chats/` |
+| `chat/` | The chat: routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, and saving it to `chats/` |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest, with sub-recipe links), matching |

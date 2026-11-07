@@ -14,6 +14,7 @@ Their output quotes the books, so save it under `testing/one_off/` (git-ignored)
 | `sub_recipe_report.py [titles] [--index PATH]` | How the recipe index linked each book's sub-recipes (by title, by kind, unlinked) and its buy-or-make links; the full list goes to `testing/one_off/sub_recipe_links.txt` | the recipe index |
 | `ingredient_trace.py "title" [...]` or `--empty [--next]` | Line by line, what the ingredient parser decided about a stored recipe, for finding out why ingredients go missing | the database |
 | `ingredient_trace.py --late-labels` | Component-style headings that come after a recipe's steps, to check by eye after a re-ingest | the database |
+| `model_timing.py [--chats PATH]` | How long the chat model takes per model and job (routing, answering, scale intent), from the timings saved with each chat reply: count, median, 90th percentile, slowest | saved chats |
 | `ingredient_trace.py --groups` | Every recipe's ingredient groups as scaling sees them (batch, component or optional), mixed recipes first | the database |
 
 The database is on the Pi, so the scripts that need it run there. The ones that need only the PDF run anywhere the PDFs are: set `COOKBOOKS_DIR` to their folder. They read the saved extraction (`EXTRACT_DIR`, made from the PDF on first use), and `structure_baseline.py` and `book_report.py` run the whole structure step without the database or a model.

@@ -3,21 +3,27 @@ Scale a recipe: find the recipe a request names (find), then scale it
 (scale_recipe). run() does both. See scale.py.
 
 scale_recipe takes a recipe that's already been found, so a follow-up
-("now halve it") can scale the same recipe again without naming it.
+("now halve it") can scale the same recipe again without naming it. Its
+base is the factor the recipe is already at: a multiplier ("halve it")
+builds on it, while a target yield ("for 12 people"), an ingredient
+limit ("I only have 1 egg") or a pan size names the end result, so it's
+worked out from the recipe as written.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from common import cli
 from books import strategy_for
 from query_utils.recipe_matching import display_title, extract_title, extract_yield_line
 from query_utils.retrieval import candidate_text, retrieve, within_distance
-from query_utils.title_lookup import find_recipes
+from query_utils.title_lookup import find_recipes, title_tokens
 from scale_utils.ingredients import extract_ingredient_groups, pick_default_batch
 from scale_utils.measurement_display import count_unit_label, format_imperial_amount, to_teaspoons
 from scale_utils.pan_scaling import detect_pan_request, pan_scale_factor_from_question
-from scale_utils.recipe_scaling import (detect_direct_multiplier, determine_scale_intent,
-                                        resolve_scale_factor, scale_ingredients)
+from scale_utils.recipe_scaling import (MAX_SANE_FACTOR, MIN_SANE_FACTOR, detect_direct_multiplier,
+                                        determine_scale_intent, normalize_basis, resolve_scale_factor,
+                                        scale_ingredients)
 
 
 @dataclass
@@ -95,12 +101,46 @@ def find(question):
 
 def run(question):
     recipe, problem = find(question)
-    return problem or scale_recipe(recipe, question)
+    return problem or scale_recipe(recipe, without_title_multipliers(question, recipe))
 
 
-def scale_recipe(recipe, question):
+def without_title_multipliers(question, recipe):
+    """The request with the multiplier words the recipe's own title uses
+    taken out once each, so "scale the double chocolate cake for 12"
+    isn't read as "double", while "double the double chocolate cake"
+    still is."""
+    for word in title_tokens(recipe.title):
+        if detect_direct_multiplier(word) is not None:
+            question = re.sub(rf"\b{re.escape(word)}\b", " ", question, count=1, flags=re.IGNORECASE)
+    return " ".join(question.split())
+
+
+def find_batch(text, batch_names):
+    """The batch size a message names ("mile high", "the full one"), by
+    the words of its name other than "batch"; None unless exactly one
+    fits best."""
+    said = set(title_tokens(text))
+    best, fits = 0, []
+    for name in batch_names:
+        shared = len(said & (set(title_tokens(name)) - {"batch"}))
+        if shared > best:
+            best, fits = shared, [name]
+        elif shared == best and shared:
+            fits.append(name)
+    return fits[0] if len(fits) == 1 else None
+
+
+def times(value):
+    return f"{format_amount(round(value, 3))}x"
+
+
+def scale_recipe(recipe, question, base=1.0, batch=None, factor=None, explanation=None):
     """Scale a found recipe (a title_lookup.Candidate) as the request
-    asks."""
+    asks. base: the factor it's already at, which a multiplier builds on.
+    batch: the batch size to use, by name (find_batch), instead of the
+    default one. factor (with explanation): use this factor as is, for
+    switching batch sizes at the current factor or going back to the
+    recipe as written."""
     recipe_text = candidate_text(recipe)
     if not recipe_text:
         return ScaleResult("stale_index", recipe=recipe, title=recipe.title, book=recipe.book)
@@ -124,7 +164,7 @@ def scale_recipe(recipe, question):
     batch_name = ""
     batches = groups.batches
     if batches:
-        batch_name = pick_default_batch({name: groups[name] for name in batches})
+        batch_name = (find_batch(batch, batches) if batch else None) or             pick_default_batch({name: groups[name] for name in batches})
         if batch_name is None:
             return ScaleResult("pick_batch", **found,
                                batches=[(name, groups.descriptions.get(name)) for name in batches])
@@ -144,9 +184,13 @@ def scale_recipe(recipe, question):
     # they are. Unambiguous multiplier phrasing ("double", "3x") and
     # pan-size requests never need to go anywhere near the model.
     intent = elapsed = None
+    relative = None                 # the multiplier, when it builds on base
     direct_factor = detect_direct_multiplier(question)
-    if direct_factor is not None:
+    if factor is not None:
+        pass
+    elif direct_factor is not None:
         factor, explanation = direct_factor, f"Direct multiplier (detected in question text): {direct_factor}x"
+        relative = direct_factor
     elif detect_pan_request(question):
         factor, explanation = pan_scale_factor_from_question(question)
         if factor is None:
@@ -155,8 +199,17 @@ def scale_recipe(recipe, question):
         intent, elapsed = determine_scale_intent(question, title, yield_line, ingredients)
         if intent is None:
             return ScaleResult("no_factor", **found, problem="no_intent", model_time=elapsed)
-        factor, explanation = resolve_scale_factor(intent, ingredients)
+        factor, explanation = resolve_scale_factor(intent, ingredients, yield_line, question)
+        if normalize_basis(intent) == "direct" and isinstance(factor, float):
+            relative = factor
     model = dict(intent=intent, model_time=elapsed)
+
+    if relative is not None and base != 1:
+        factor = base * relative
+        explanation = f"{times(relative)} the {times(base)} version = {times(factor)} the recipe as written"
+        if not MIN_SANE_FACTOR <= factor <= MAX_SANE_FACTOR:
+            return ScaleResult("no_factor", **found, **model, problem="unresolved",
+                               explanation=f"{explanation}, which is outside the range I'll scale to")
 
     if factor == "ambiguous":
         return ScaleResult("no_factor", **found, **model, problem="ambiguous", ambiguous=explanation)

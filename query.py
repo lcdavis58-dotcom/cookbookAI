@@ -11,8 +11,9 @@ Where things live:
     query_utils/recipe_matching.py   titles, yield lines
     query_utils/title_lookup.py      which recipe a question names
 
-Requires the same packages as ingest.py, plus your chat model pulled, e.g.:
-    ollama pull llama3.2:1b
+Requires the same packages as ingest.py, plus the chat model (CHAT_MODEL
+in common/config.py) pulled:
+    ollama pull qwen2.5:7b
 """
 
 from actions import ask
