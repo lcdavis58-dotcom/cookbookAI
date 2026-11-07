@@ -22,6 +22,24 @@ Currently supported books (each has its own settings in `books/`):
 
 ## What it does
 
+**Chat** (`chat.py`): all of the below in one conversation, with follow-ups. Answer "which one?" with a number or part of the name, scale what's on screen again ("now halve it" builds on the last scale; "back to the original" undoes it), change the ingredients you searched ("add lemons", "without the pecans"), or ask about the recipe you're looking at.
+
+```
+python3 chat.py
+> double the whipped cream
+I found 2 recipes that could be. Which one? ...
+> the classic one
+Scaling 'Classic Whipped Cream' (Full Batch) from The Book On Pie... 2.0x
+> now halve it
+0.5x the 2x version = 1x the recipe as written
+> what can I make with pecans and cream cheese
+> add lemons
+> #1
+> how long does it chill?
+```
+
+Every message is saved as it's sent (in `chats/`), so a chat can be picked up later: `python3 chat.py` offers to continue the latest one and to answer a message that never got a reply. `--new` starts a new chat, `--list` lists them, `--open N` opens one; in a chat, `/help` lists the commands. Plain rules handle the common follow-ups; anything else goes to the chat model, and when it's unclear what you mean, it asks.
+
 **Ask about a recipe** (`query.py`): finds a recipe by its title (forgiving of plurals, accents, typos and filler words; add "from <book>" to pick a book, misspelled, shortened or as an acronym like "sfah") or by semantic search, and answers using only the text of your books, with book and page citations.
 
 ```
@@ -87,7 +105,7 @@ Every chat reply saves how long each model call took, and `tools/diagnostics/mod
 |---|---|
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `actions/` | What `query.py`, `scale.py` and `match.py` do, each returning its result as data plus the text the command line prints; the scripts are thin wrappers |
-| `chat/` | The chat: routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, and saving it to `chats/` |
+| `chat.py`, `chat/` | The chat: the terminal loop, routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, and saving it to `chats/` |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest, with sub-recipe links), matching |

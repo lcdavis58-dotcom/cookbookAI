@@ -59,6 +59,20 @@ def handle(state, message, directory=CHATS_DIR, candidates=None):
     """One turn, saved before the work starts and again with the reply."""
     state.add_user(message)
     store.save(state, directory)
+    return _answer(state, message, directory, candidates)
+
+
+def retry(state, directory=CHATS_DIR, candidates=None):
+    """Answer her last message, saved earlier but never answered (the
+    connection dropped, or the reply was stopped). None if there's no
+    such message."""
+    message = state.unanswered()
+    if message is None:
+        return None
+    return _answer(state, message, directory, candidates)
+
+
+def _answer(state, message, directory, candidates):
     models.clear()
     turn = respond(state, message, candidates)
     state.add_reply(turn.text, turn.action, turn.route.label if turn.route else None, models.CALLS)
