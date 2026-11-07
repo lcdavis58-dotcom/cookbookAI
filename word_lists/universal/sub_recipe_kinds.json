@@ -1,0 +1,20 @@
+{
+  "_comment": "General kinds of sub-recipe, and the names each goes by. A recipe whose title ends in one of the names ('All-Buttah Pie Dough', 'Golden Cheese Rough Puff Pastry') or is one ('Pâte Brisée') is of that kind. In matching, having any name of a kind ('pie crust') covers a sub-recipe of that kind, with a note, and a reference written as a kind ('9-inch pie crust (see Recommended Crusts)') can be made with any of the book's recipes of that kind. Names are compared without accents, case or plurals. Only list names that mean the same thing to a cook; a graham crust is not a pie dough.",
+  "kinds": {
+    "pie dough": ["pie dough", "pie crust", "piecrust", "pie pastry", "pie shell", "pâte brisée", "flaky pastry dough", "flaky pie dough"],
+    "tart dough": ["tart dough", "tart crust", "tart shell", "tart pastry", "pâte sucrée", "pâte sablée", "sweet tart dough"],
+    "puff pastry": ["puff pastry", "rough puff", "pâte feuilletée"],
+    "choux pastry": ["pâte à choux", "choux pastry", "choux dough"],
+    "pastry cream": ["pastry cream", "crème pâtissière"],
+    "whipped cream": ["whipped cream", "chantilly cream", "crème chantilly"],
+    "caramel sauce": ["caramel sauce", "salted caramel sauce", "salted caramel"],
+    "lemon curd": ["lemon curd"],
+    "pizza dough": ["pizza dough"],
+    "simple syrup": ["simple syrup"],
+    "graham cracker crust": ["graham cracker crust", "graham crust"],
+    "vegetable stock": ["vegetable stock", "vegetable broth"],
+    "chicken stock": ["chicken stock", "chicken broth"],
+    "pesto": ["pesto"],
+    "mayonnaise": ["mayonnaise", "mayo"]
+  }
+}

@@ -36,7 +36,7 @@ python3 scale.py "the chocolate whipped cream feeds 6, I need 10"
 python3 scale.py "classic whipped cream needs 2 eggs, I only have 1"
 ```
 
-**Find recipes from what you have** (`match.py`): lists recipes you can make now, and ones missing just one thing, from the ingredients you name. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand.
+**Find recipes from what you have** (`match.py`): lists recipes you can make now, and ones missing just one thing, from the ingredients you name. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand. A recipe that calls for another of the book's recipes (a crust, a curd, a sauce) counts it as on hand if you have it, have a general form of it ("pie crust" for a specific pie dough), or can make it from what you have. Misspelled ingredients ("cinamon") are corrected, and the correction is printed first.
 
 ```
 python3 match.py "pecans, cream cheese, lemons"
@@ -85,7 +85,7 @@ Run every script from `app/`.
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
-| `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest), matching |
+| `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest, with sub-recipe links), matching |
 | `books/` | Per-book settings, the shared engine that applies them, and ingredient line styles |
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
@@ -100,7 +100,7 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- Check sub-recipes when matching ingredients (a recipe that calls for "1 recipe Brioche Dough" also needs that recipe's ingredients), designed once every book's way of referring to its own recipes is known
+- Use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
 - A locally hosted web interface for household use
 

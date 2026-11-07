@@ -45,7 +45,7 @@ def slugify(title):
 
 def _load_json(path, default):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         return default

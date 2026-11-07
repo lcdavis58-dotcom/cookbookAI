@@ -11,6 +11,7 @@ Their output quotes the books, so save it under `testing/one_off/` (git-ignored)
 | `dump_pages.py "Book Title" [first last]` | What ingest's title detection sees in a real PDF | the PDF |
 | `dump_blocks.py "Book Title" "text"` | Every page containing the text, line by line, with block, position, font size, bold/italic and the gap above | the PDF |
 | `ingredient_frequency.py [--csv out.csv]` | How often each ingredient appears across all ingested recipes, plus normalization and parser gaps | the database |
+| `sub_recipe_report.py [titles] [--index PATH]` | How the recipe index linked each book's sub-recipes (by title, by kind, unlinked) and its buy-or-make links; the full list goes to `testing/one_off/sub_recipe_links.txt` | the recipe index |
 | `ingredient_trace.py "title" [...]` or `--empty [--next]` | Line by line, what the ingredient parser decided about a stored recipe, for finding out why ingredients go missing | the database |
 | `ingredient_trace.py --late-labels` | Component-style headings that come after a recipe's steps, to check by eye after a re-ingest | the database |
 | `ingredient_trace.py --groups` | Every recipe's ingredient groups as scaling sees them (batch, component or optional), mixed recipes first | the database |

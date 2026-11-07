@@ -29,11 +29,13 @@ Entry shape:
 
 import json
 import os
+import re
 from collections import defaultdict
 
 from books import profile_for_book, strategy_for
 from common.config import RECIPE_INDEX_PATH
 from match_utils.ingredient_names import normalize, options, pieces
+from match_utils.sub_recipes import link_sub_recipes
 from query_utils.recipe_matching import display_title, extract_title
 from scale_utils.ingredients import extract_ingredient_groups
 
@@ -81,7 +83,7 @@ def index_entry(recipe_id, recipe):
         return None
     groups = extract_ingredient_groups(text, strategy)
 
-    required, optional, sub_recipes, your_choice = [], [], [], []
+    required, optional, sub_recipes, optional_sub_recipes, your_choice = [], [], [], [], []
     for group_name, ingredients in groups.items():
         in_optional_group = groups.kinds.get(group_name) == "optional"
         for ing in ingredients:
@@ -97,6 +99,8 @@ def index_entry(recipe_id, recipe):
             if "sub_recipe" in flags:
                 if ing["name"] not in sub_recipes:
                     sub_recipes.append(ing["name"])
+                    if in_optional_group or "optional" in flags:
+                        optional_sub_recipes.append(ing["name"])
                 continue
             target = optional if in_optional_group or "optional" in flags else required
             # The same ingredient in two batches, or in two components,
@@ -120,6 +124,7 @@ def index_entry(recipe_id, recipe):
         "ingredients": required,
         "optional": optional,
         "sub_recipes": sub_recipes,
+        "optional_sub_recipes": optional_sub_recipes,
         "your_choice": your_choice,
         "groups": {name: groups.kinds[name] for name in groups if name != "default"},
     }
@@ -129,25 +134,57 @@ def build_index():
     """The index for every recipe in the database, sorted by book, then
     title."""
     entries = [e for e in (index_entry(key, r) for key, r in load_recipes().items()) if e]
+    link_sub_recipes(entries)
     return sorted(entries, key=lambda e: (e["book"], e["title"].lower()))
 
 
 def save_index(entries, path=RECIPE_INDEX_PATH):
+    """Saves the entries, plus how often each word appears in their
+    ingredient names (match_utils/typos.py corrects misspelled
+    ingredients against it)."""
     # Written to a temporary file first, so a crash mid-write never
     # leaves a half-written index behind.
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"recipes": entries}, f, ensure_ascii=False, indent=1)
+        json.dump({"recipes": entries, "ingredient_words": ingredient_words(entries)},
+                  f, ensure_ascii=False, indent=1)
     os.replace(tmp, path)
+
+
+def _load(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
 
 
 def load_index(path=RECIPE_INDEX_PATH):
     """The saved index entries, or None if it hasn't been built yet."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)["recipes"]
-    except FileNotFoundError:
-        return None
+    data = _load(path)
+    return None if data is None else data["recipes"]
+
+
+def load_ingredient_words(path=RECIPE_INDEX_PATH, entries=None):
+    """{word: how many recipes use it} saved with the index. An index
+    saved before this was stored gets it counted from its entries."""
+    data = _load(path)
+    if data and "ingredient_words" in data:
+        return data["ingredient_words"]
+    entries = entries if entries is not None else (data or {}).get("recipes", [])
+    return ingredient_words(entries)
+
+
+def ingredient_words(entries):
+    """{word: how many recipes have an ingredient with that word}, from
+    every option of every required and optional ingredient."""
+    counts = defaultdict(int)
+    for e in entries:
+        words = {w for requirement in e["ingredients"] + e["optional"]
+                 for option in requirement["options"] for w in re.findall(r"[^\W\d_]+", option.lower())}
+        for w in words:
+            counts[w] += 1
+    return dict(sorted(counts.items()))
 
 
 def summarize(entries):

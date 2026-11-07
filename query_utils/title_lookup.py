@@ -85,6 +85,7 @@ MAX_LISTED = 10
 
 _DROP_CHARS_RE = re.compile(r"[’'`´®™©™®]")
 _SPLIT_RE = re.compile(r"[^a-z0-9]+")
+_PAREN_RE = re.compile(r"\([^)]*\)")
 
 
 def title_tokens(text):
@@ -92,12 +93,19 @@ def title_tokens(text):
     removed, apostrophes closed up ("angel's" -> "angels"), split at
     hyphens and other punctuation, filler words and single letters
     (not digits) dropped. Plurals are left alone here; word_forms handles them."""
-    text = unicodedata.normalize("NFKD", text or "")
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    text = _DROP_CHARS_RE.sub("", text.lower()).replace("&", " and ")
     # Single digits stay: they tell "Field Blend #1" from "Field Blend #2".
-    return [w for w in _SPLIT_RE.split(text)
+    return [w for w in _SPLIT_RE.split(_plain_text(text))
             if (len(w) > 1 or w.isdigit()) and w not in FILLER_WORDS]
+
+
+def _plain_text(text):
+    """Lowercase, marks and apostrophes removed, then accents. Marks go
+    first: Unicode normalization would turn "™" into the letters "TM"
+    ("Cereal Milk™" -> "cereal milktm")."""
+    text = _DROP_CHARS_RE.sub("", (text or "").lower())
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return text.replace("&", " and ")
 
 
 def word_forms(word):
@@ -122,7 +130,7 @@ def word_forms(word):
     return frozenset(forms)
 
 
-def _edit_distance(a, b, limit):
+def edit_distance(a, b, limit):
     """Optimal string alignment distance (a swap of two neighbours counts
     as one edit), or limit + 1 once it's sure to be over limit."""
     if abs(len(a) - len(b)) > limit:
@@ -171,7 +179,10 @@ def _split_soft(core, extra):
 
 
 def _variants(match_title, full_title, aliases):
-    core = list(dict.fromkeys(title_tokens(match_title)))
+    # Words in parentheses are an aside, scored like a "with ..." tail:
+    # "Biscuit Topping (Make It a Cobbler Pie)" is named by "biscuit
+    # topping".
+    core = list(dict.fromkeys(title_tokens(_PAREN_RE.sub(" ", match_title)) or title_tokens(match_title)))
     extra = [w for w in dict.fromkeys(title_tokens(full_title)) if w not in core]
     variants = [_split_soft(core, extra)] if core else []
     for alias in aliases:
@@ -236,10 +247,7 @@ def _words(text):
     """Every word of a text, normalized like title_tokens but with the
     filler words and single letters kept (book names are matched word
     for word, and acronyms are made from every word)."""
-    text = unicodedata.normalize("NFKD", text or "")
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    text = _DROP_CHARS_RE.sub("", text.lower()).replace("&", " and ")
-    return [w for w in _SPLIT_RE.split(text) if w]
+    return [w for w in _SPLIT_RE.split(_plain_text(text)) if w]
 
 
 def _same_word(typed, word):
@@ -248,7 +256,7 @@ def _same_word(typed, word):
     if word_forms(typed) & word_forms(word):
         return True
     limit = typo_limit(word)
-    return bool(limit) and typed[0] == word[0] and _edit_distance(typed, word, limit) <= limit
+    return bool(limit) and typed[0] == word[0] and edit_distance(typed, word, limit) <= limit
 
 
 def book_acronyms(book):
@@ -378,7 +386,7 @@ def _question_forms(words, vocabulary):
         # Same first letter: typos are rarely there, and it keeps
         # unrelated words of the same length apart.
         close = {w for form, w in vocabulary.items()
-                 if form[0] == q[0] and _edit_distance(q, form, limit) <= limit}
+                 if form[0] == q[0] and edit_distance(q, form, limit) <= limit}
         if close:
             typos[q] = sorted(close)
             for w in close:

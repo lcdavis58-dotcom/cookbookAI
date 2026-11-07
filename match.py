@@ -17,25 +17,17 @@ Where things live:
     match_utils/matching.py          what counts as on hand, ranking
     match_utils/ingredient_names.py  normalizing what you typed
     match_utils/recipe_index.py      the index itself
+    match_utils/typos.py             correcting misspelled ingredients
 """
-
-import re
 
 from common import cli
 from match_utils.matching import find_matches, load_staples, parse_have
-from match_utils.recipe_index import load_index
+from match_utils.recipe_index import load_index, load_ingredient_words
+from match_utils.typos import TypoFixer
+from match_utils.typos import describe as describe_typos
 
 # How many recipes to list in each section before summarizing the rest.
 SHOW_PER_SECTION = 15
-
-
-def short_name(sub_recipe):
-    """A sub-recipe line without its prep notes: "9-inch / 23-cm pie crust
-    (see Recommended Crusts), parbaked and cooled" -> "9-inch / 23-cm pie
-    crust", "recipe Brioche Dough" -> "Brioche Dough"."""
-    name = re.sub(r"\s*\([^)]*\)", "", sub_recipe.split(",", 1)[0]).strip()
-    return re.sub(r"^(?:[\d½]+\s+)?(?:double |triple )?(?:recipes?|(?:half |full |regular |mile-high )?"
-                  r"batch(?:es)? of)\s+", "", name, flags=re.IGNORECASE)
 
 
 def describe(result):
@@ -43,10 +35,17 @@ def describe(result):
     lines = [f"  {entry['title']}  [{entry['book']}"
              + (f", p.{entry['page']}" if entry["page_confirmed"] else "") + "]"]
     lines.append(f"      uses: {', '.join(result['uses'])}")
+    if result.get("stand_ins"):
+        lines.append(f"      using {'; '.join(result['stand_ins'])}")
+    if result.get("makes"):
+        scratch = set(result.get("from_scratch", []))
+        lines.append("      make first: " + ", ".join(
+            f"{name} (from pantry staples)" if name in scratch else name for name in result["makes"]))
     if result["missing"]:
         lines.append(f"      missing: {', '.join(result['missing'])}")
-    also = ([f"{name} (your choice)" for name in entry.get("your_choice", [])]
-            + [short_name(name) for name in entry["sub_recipes"]])
+    # Unlinked sub-recipes are counted in "missing" now; only the
+    # placeholders that can't be matched are shown on their own.
+    also = [f"{name} (your choice)" for name in entry.get("your_choice", [])]
     if also:
         lines.append(f"      also needs: {'; '.join(also)}")
     if cli.DEBUG:
@@ -76,6 +75,11 @@ def match(text):
     if not have:
         print("List the ingredients you have, separated by commas.")
         return
+    # Misspelled ingredients are corrected before anything else, and
+    # said so first, so a typo never silently loses every match.
+    have, corrections = TypoFixer(load_ingredient_words(entries=index), load_staples()).fix(have)
+    if corrections:
+        print(describe_typos(corrections))
     print(f"You have: {', '.join(have)}  (plus pantry staples)")
     if cli.DEBUG:
         print(f"[debug] staples: {', '.join(sorted(load_staples()))}")
@@ -90,7 +94,11 @@ def match(text):
                 assumptions.append(note)
     for note in assumptions:
         print(f"  ({note})")
-    print_section("You can make", [r for r in results if not r["missing"]])
+    ready = [r for r in results if not r["missing"]]
+    print_section("You can make", [r for r in ready if not r["from_scratch"]])
+    # Makeable, but only by making a sub-recipe (a pie dough) entirely
+    # from pantry staples: real work the person didn't mention.
+    print_section("You can make, with a sub-recipe from scratch", [r for r in ready if r["from_scratch"]])
     print_section("Missing one thing", [r for r in results if len(r["missing"]) == 1])
 
 

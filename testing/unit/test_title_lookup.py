@@ -47,6 +47,11 @@ class Words(unittest.TestCase):
         self.assertEqual(title_tokens("Angel’s Crème Caramel"), ["angels", "creme", "caramel"])
         self.assertEqual(title_tokens("Deep-Dish Plum Crumble"), ["deep", "dish", "plum", "crumble"])
         self.assertEqual(title_tokens("Milky Star® Bars & Squares"), ["milky", "star", "bars", "squares"])
+        self.assertEqual(title_tokens("Oat Milk™ Ice Cream"), ["oat", "milk", "ice", "cream"])
+
+    def test_parenthesized_words_not_required(self):
+        candidates = candidates_from_index([entry("x", "Book C", "Crumb Topping (For a Crisp Pie)")])
+        self.assertEqual([c.key for c in lookup("double the crumb topping", candidates).matches], ["x"])
         self.assertEqual(title_tokens("Pie with a Crust"), ["pie", "crust"])
         self.assertEqual(title_tokens("Grain Mix #2"), ["grain", "mix", "2"])
 
