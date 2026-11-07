@@ -1,6 +1,6 @@
 """
-Command-line handling shared by query.py and scale.py, including the one
-debug switch both scripts (and the utilities they call) read.
+Command-line handling shared by query.py, scale.py and match.py,
+including the one debug switch the scripts (and the code they call) read.
 """
 
 import argparse

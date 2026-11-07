@@ -16,7 +16,7 @@ from common.embeddings import embed_query
 # and only uses these hits to order equally good titles, or as the titles
 # to search when the index hasn't been built; that fallback is why
 # TITLE_SEARCH_K stays generous (plain vector search, no generation, so a
-# wide net costs almost nothing). query.LLM_CONTEXT_K stays small, that's
+# wide net costs almost nothing). actions/ask.py's LLM_CONTEXT_K stays small, that's
 # how many chunks actually get pasted into a prompt if we fall through to
 # generation, and a bigger prompt directly costs more time on the Pi's CPU.
 TITLE_SEARCH_K = 20
