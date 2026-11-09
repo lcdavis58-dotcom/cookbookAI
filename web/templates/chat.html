@@ -16,9 +16,18 @@
   <ul>
     {% for c in chats %}
     <li>
-      <a href="{{ url_for('chats.show', chat_id=c.id) }}"
-         {% if chat and c.id == chat.id %}aria-current="page"{% endif %}>{{ c.title or "New chat" }}</a>
-      <small>{{ c.updated | when }}</small>
+      <div>
+        <a href="{{ url_for('chats.show', chat_id=c.id) }}"
+           {% if chat and c.id == chat.id %}aria-current="page"{% endif %}>{{ c.title or "New chat" }}</a>
+        <small>{{ c.updated | when }}</small>
+      </div>
+      <button type="button" class="delete-chat"
+              aria-label="Delete {{ c.title or 'this chat' }}" title="Delete this chat"
+              hx-post="{{ url_for('chats.delete', chat_id=c.id) }}"
+              hx-target="closest li"
+              hx-swap="outerHTML"
+              {% if chat and c.id == chat.id %}hx-vals='{"open": "1"}'{% endif %}
+              hx-confirm="Delete “{{ c.title or 'this chat' }}”? This can't be undone.">✕</button>
     </li>
     {% endfor %}
   </ul>
@@ -39,6 +48,22 @@
   <header class="chat-header">
     <a class="to-chats" href="#chat-list">Chats</a>
     <h1>{{ chat.title if chat and chat.title else "New chat" }}</h1>
+    {% if chat %}
+    <details class="rename">
+      <summary aria-label="Rename this chat" title="Rename this chat">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+        </svg>
+      </summary>
+      <form class="rename-panel quick-row" hx-post="{{ url_for('chats.rename', chat_id=chat.id) }}">
+        <input name="title" value="{{ chat.title }}" maxlength="{{ max_title_chars }}" required
+               autocomplete="off" aria-label="Chat name">
+        <button type="submit" class="tap">Save</button>
+      </form>
+    </details>
+    {% endif %}
   </header>
   {% if gone %}
   <p>Not in the books anymore, they were re-ingested: {{ gone | join(", ") }}.</p>

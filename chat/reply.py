@@ -67,9 +67,9 @@ def match_reply(result):
     for heading, results in (("You can make", result.ready),
                              ("You can make, with a sub-recipe from scratch", result.from_scratch),
                              ("Missing some ingredients", result.missing_some)):
-        lines.append(f"\n{heading} ({len(results)}):")
         if not results:
-            lines.append("  (none)")
+            continue
+        lines.append(f"\n{heading} ({len(results)}):")
         for r in results[:match.SHOW_PER_SECTION]:
             number += 1
             entry_lines = match.describe(r)
@@ -77,6 +77,8 @@ def match_reply(result):
             lines += entry_lines
         if len(results) > match.SHOW_PER_SECTION:
             lines.append(f"  ...and {len(results) - match.SHOW_PER_SECTION} more")
+    if not number:
+        lines.append("\nI couldn't find any recipes that use those.")
     if number:
         lines.append('\nTo see a recipe, type its number. To change your search, type "add" or "without" '
                      'and an ingredient, like "add lemons."')

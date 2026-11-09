@@ -76,7 +76,7 @@ small {
   width: 100%;
   max-width: 48rem;
   min-height: 100dvh;
-  padding: 1rem 1rem 0;
+  padding: 0 1rem;
 }
 
 /* These two links only exist for the phone layout. */
@@ -85,12 +85,64 @@ small {
   display: none;
 }
 
+/* The top bar stays in view as a long chat scrolls. Sticky also makes it
+   what the rename panel is positioned against. */
 .chat-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding-bottom: 0.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  background: var(--page);
   border-bottom: 1px solid var(--line);
+}
+
+.chat-header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* <details> opens and closes by itself, with no JavaScript. */
+.rename summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--muted);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rename summary::-webkit-details-marker {
+  display: none;
+}
+
+.rename summary:hover,
+.rename[open] summary {
+  color: var(--accent);
+  background: var(--panel);
+}
+
+.rename-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: min(24rem, 100%);
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.rename-panel input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 /* ---- Chat list ---- */
@@ -117,8 +169,32 @@ small {
 }
 
 #chat-list li {
-  padding: 0.5rem 0.625rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem 0.5rem 0.625rem;
   border-radius: 0.5rem;
+}
+
+#chat-list li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+#chat-list li button.delete-chat {
+  flex: none;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+#chat-list li button.delete-chat:hover {
+  background: var(--page);
+  color: var(--alert);
 }
 
 #chat-list li:has(a[aria-current]) {
@@ -148,8 +224,8 @@ small {
 
 .message {
   margin-bottom: 1rem;
-  /* Leaves a gap above a reply when the page scrolls to its start. */
-  scroll-margin-top: 0.75rem;
+  /* When the page scrolls to a reply's start, keep it below the top bar. */
+  scroll-margin-top: 4.5rem;
 }
 
 .message strong {

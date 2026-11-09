@@ -8,7 +8,8 @@ seconds until the reply is saved. The #status element at the end of the
 conversation is what those requests replace.
 
 Only the worker saves a chat while it's answering, so viewing never
-saves, and a new message is refused until the reply is done.
+saves, and a new message, a rename or a delete is refused until the
+reply is done.
 """
 
 import os
@@ -25,6 +26,7 @@ from chat.state import ChatState, refresh
 # The shape of chat.state.new_id, e.g. 2026-11-06-1932-k4f2.
 CHAT_ID = r"\d{4}-\d{2}-\d{2}-\d{4}-[a-z0-9]{4}"
 MAX_MESSAGE_CHARS = 4000
+MAX_TITLE_CHARS = 100
 SLOW_AFTER_SECONDS = 30
 
 bp = Blueprint("chats", __name__)
@@ -38,7 +40,7 @@ def require_login():
 
 @bp.context_processor
 def limits():
-    return {"max_message_chars": MAX_MESSAGE_CHARS}
+    return {"max_message_chars": MAX_MESSAGE_CHARS, "max_title_chars": MAX_TITLE_CHARS}
 
 
 def chats_dir():
@@ -145,9 +147,7 @@ def create():
     chat = ChatState.new()
     chat.add_user(message_text())
     answers().submit(chats_dir(), chat.id, before=lambda: store.save(chat, chats_dir()))
-    response = make_response("", 204)
-    response.headers["HX-Redirect"] = url_for("chats.show", chat_id=chat.id)
-    return response
+    return go_to(url_for("chats.show", chat_id=chat.id))
 
 
 @bp.get("/chats/<chat_id:chat_id>")
@@ -179,6 +179,43 @@ def send(chat_id):
     # mustn't lose something she was in the middle of typing.
     return render_template("_sent.html", chat=chat, status=status, oob=True, message=chat.messages[-1],
                            number=len(chat.messages), clear_box=request.headers.get("HX-Trigger") == "composer")
+
+
+def go_to(url):
+    """Tell HTMX to load a whole new page."""
+    response = make_response("", 204)
+    response.headers["HX-Redirect"] = url
+    return response
+
+
+def change_chat(chat_id, change):
+    """Rename or delete, refused (409) while a reply is being worked on."""
+    if not answers().while_idle(chats_dir(), chat_id, change):
+        abort(409)
+
+
+@bp.post("/chats/<chat_id:chat_id>/rename")
+def rename(chat_id):
+    title = request.form.get("title", "").strip()
+    if not title or len(title) > MAX_TITLE_CHARS:
+        abort(400)
+
+    def save():
+        chat = load_chat(chat_id)
+        chat.title = title
+        store.save(chat, chats_dir())
+
+    change_chat(chat_id, save)
+    return go_to(url_for("chats.show", chat_id=chat_id))
+
+
+@bp.post("/chats/<chat_id:chat_id>/delete")
+def delete(chat_id):
+    """The chat being read has to be left; any other just leaves the list
+    (the empty response replaces its row)."""
+    load_chat(chat_id)                      # 404 if it isn't this account's
+    change_chat(chat_id, lambda: store.delete(chat_id, chats_dir()))
+    return go_to(url_for("chats.index")) if request.form.get("open") else ""
 
 
 @bp.post("/chats/<chat_id:chat_id>/answer")

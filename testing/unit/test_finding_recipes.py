@@ -108,6 +108,16 @@ class WordingTest(unittest.TestCase):
                          ["assuming your chocolate is the kind each recipe calls for",
                           "assuming your butter is salted butter"])
 
+    def test_empty_sections_are_left_out(self):
+        text = reply.match_reply(match.MatchResult("matches", have=["lemon"], missing_some=[self.found(["x"])]))
+        self.assertNotIn("(none)", text)
+        self.assertNotIn("You can make", text)
+        self.assertIn("Missing some ingredients (1):", text)
+
+    def test_no_results_at_all_says_so(self):
+        text = reply.match_reply(match.MatchResult("matches", have=["lemon"]))
+        self.assertIn("I couldn't find any recipes", text)
+
     def test_hint_is_plain(self):
         result = match.MatchResult("matches", have=["lemon"], ready=[self.found()])
         self.assertIn('To see a recipe, type its number. To change your search, type "add" or "without"',

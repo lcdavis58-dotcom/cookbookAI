@@ -72,6 +72,15 @@ class Answers:
         self.queue.put(key)
         return True
 
+    def while_idle(self, directory, chat_id, change):
+        """Run change() (a rename or delete) unless a reply is being worked
+        on, since the worker's save would undo it. False if one is."""
+        with self.lock:
+            if (directory, chat_id) in self.started:
+                return False
+            change()
+            return True
+
     def seconds_working(self, directory, chat_id):
         """How long this chat's reply has been in progress, None if it isn't."""
         with self.lock:

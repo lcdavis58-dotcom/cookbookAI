@@ -1,6 +1,8 @@
 # CookbookAI
 
-A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes and scale them up or down. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service.
+Version 1.0.0
+
+A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
 Currently supported books (each has its own settings in `books/`):
 - *The Book On Pie*
@@ -40,6 +42,8 @@ Scaling 'Classic Whipped Cream' (Full Batch) from The Book On Pie... 2.0x
 
 Every message is saved as it's sent (in `chats/`), so a chat can be picked up later: `python3 chat.py` offers to continue the latest one and to answer a message that never got a reply. `--new` starts a new chat, `--list` lists them, `--open N` opens one; in a chat, `/help` lists the commands. Plain rules handle the common follow-ups; anything else goes to the chat model, and when it's unclear what you mean, it asks.
 
+In a chat, "what pumpkin pie recipes do I have" lists every recipe with those words in its title, by book, and a general name like "pie crust" lists every recipe of that kind, whatever the book calls it.
+
 **Ask about a recipe** (`query.py`): finds a recipe by its title (forgiving of plurals, accents, typos and filler words; add "from <book>" to pick a book, misspelled, shortened or as an acronym like "sfah") or by semantic search, and answers using only the text of your books, with book and page citations.
 
 ```
@@ -54,13 +58,28 @@ python3 scale.py "the chocolate whipped cream feeds 6, I need 10"
 python3 scale.py "classic whipped cream needs 2 eggs, I only have 1"
 ```
 
-**Find recipes from what you have** (`match.py`): lists recipes you can make now, and ones missing just one thing, from the ingredients you name. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand. A recipe that calls for another of the book's recipes (a crust, a curd, a sauce) counts it as on hand if you have it, have a general form of it ("pie crust" for a specific pie dough), or can make it from what you have. Misspelled ingredients ("cinamon") are corrected, and the correction is printed first.
+**Find recipes from what you have** (`match.py`): lists recipes that use what you name, the ones using the most of it first, then the ones missing the least. A recipe has to use all of one or two ingredients, or two-thirds of a longer list; if none do, it says so and shows the closest. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand, and don't count toward how much of your list a recipe uses. A recipe that calls for another of the book's recipes (a crust, a curd, a sauce) counts it as on hand if you have it, have a general form of it ("pie crust" for a specific pie dough), or can make it from what you have. Misspelled ingredients ("cinamon") are corrected, and the correction is printed first.
 
 ```
 python3 match.py "pecans, cream cheese, lemons"
 ```
 
 Add `-d` to any of these commands for debug output.
+
+## The website
+
+The same chat in a browser (`serve.py`), for phones and computers: each person signs in and has their own chats, which they can rename (the pencil beside the title) or delete (the ✕ in the chat list). Replies are worked out in the background so a locked phone or lost signal doesn't lose one, and lists and ingredients can be tapped instead of typed.
+
+```
+pip install flask flask-login flask-wtf waitress
+python3 tools/add_user.py NAME     # create an account, or change its password
+python3 serve.py                   # http://127.0.0.1:8000, this computer only
+python3 serve.py --lan             # also reachable from your home network
+```
+
+There's no sign-up page: `tools/add_user.py` also has `--list` and `--remove NAME`. Changing a password signs that account out everywhere. Each account's chats are in `chats/users/<name>/`, separate from the command line's in `chats/`.
+
+**Reaching it from outside your home:** don't forward a router port to it. Use something that gates access first; [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) with an Access email allowlist works, and connects outward from your machine. Run `python3 serve.py --https`, without `--lan`, which also stops the login cookie being sent without HTTPS. Note that your chats and recipe text then pass through Cloudflare.
 
 ## Setup
 
@@ -78,6 +97,8 @@ CookbookAI/
 ├── chroma_db/    <- created by ingest.py
 ├── chats/        <- saved chats, one file each (CHATS_DIR overrides it)
 ├── extracted/    <- saved PDF extractions, created by ingest.py
+├── users.json    <- website accounts, password hashes only (USERS_PATH)
+├── web_secret.key <- signs website logins, created on first run (WEB_SECRET_PATH)
 └── cookbooks/    <- your PDFs (not included)
 ```
 
@@ -97,6 +118,8 @@ Run every script from `app/`.
 
 One chat model, `CHAT_MODEL` in `common/config.py` (`qwen2.5:7b`), does every model job: answering questions, reading scaling requests, and routing chat messages. Set the `CHAT_MODEL` environment variable to try another. It's slow on a Raspberry Pi's CPU; most common requests are handled by plain rules and never reach it.
 
+A model call that runs past `MODEL_TIMEOUT` seconds (300 by default) is given up on, and the message stays saved to try again.
+
 Every chat reply saves how long each model call took, and `tools/diagnostics/model_timing.py` summarizes them per model and job, for comparing a larger model's accuracy against its wait.
 
 ## Project layout
@@ -106,6 +129,7 @@ Every chat reply saves how long each model call took, and `tools/diagnostics/mod
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `actions/` | What `query.py`, `scale.py` and `match.py` do, each returning its result as data plus the text the command line prints; the scripts are thin wrappers |
 | `chat.py`, `chat/` | The chat: the terminal loop, routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, and saving it to `chats/` |
+| `serve.py`, `web/` | The website: sign-in, the chat pages, replies worked out in the background |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
 | `match.py`, `match_utils/` | Ingredient name normalization, the recipe index (built at ingest, with sub-recipe links), matching |
@@ -125,7 +149,8 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 - Use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
-- A locally hosted web interface for household use
+- Show chat replies word by word on the website
+- Lay recipes out more readably on the website
 
 ## Note
 

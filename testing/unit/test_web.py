@@ -25,7 +25,7 @@ from common.config import MODEL_TIMEOUT  # noqa: E402
 from match_utils.matching import parse_have  # noqa: E402
 from web import create_app  # noqa: E402
 from web.auth import FAILURE_LIMIT, WAIT_SECONDS, Throttle  # noqa: E402
-from web.routes import MAX_MESSAGE_CHARS  # noqa: E402
+from web.routes import MAX_MESSAGE_CHARS, MAX_TITLE_CHARS  # noqa: E402
 
 PASSWORD = "correct horse"
 
@@ -230,7 +230,7 @@ class SendingTest(WebCase):
         chat.add_user("how long does it chill?")
         chat.add_reply("About an hour.", action="ask")
         store.save(chat, self.dir)
-        self.assertNotIn("hx-vals", self.page(f"/chats/{chat.id}"))
+        self.assertNotIn('hx-vals=\'{"message"', self.page(f"/chats/{chat.id}"))
 
     def test_nothing_tappable_while_working(self):
         chat = self.after_match()
@@ -411,6 +411,110 @@ class SendingTest(WebCase):
         self.assertEqual(response.headers["HX-Redirect"], "/login")
 
 
+class ManagingChatsTest(WebCase):
+    def setUp(self):
+        super().setUp()
+        self.sign_in()
+        self.dir = self.user_dir()
+        self.answers = self.app.extensions["answers"]
+        self.release = threading.Event()
+        self.answers.work = lambda *_: self.release.wait(5)
+
+    def rename(self, chat, title="Sunday pies"):
+        return self.client.post(f"/chats/{chat.id}/rename", data={"title": title})
+
+    def working_on(self, chat):
+        self.addCleanup(self.answers.join)
+        self.addCleanup(self.release.set)
+        self.client.post(f"/chats/{chat.id}/answer")
+
+    def test_pencil_is_in_the_top_bar_and_x_in_the_list(self):
+        chat = self.saved_chat()
+        page = self.page(f"/chats/{chat.id}")
+        header = page[page.index('class="chat-header"'):page.index("</header>")]
+        side = page[page.index('id="chat-list"'):page.index("</nav>")]
+        self.assertIn(f'hx-post="/chats/{chat.id}/rename"', header)
+        self.assertNotIn("/delete", header)
+        self.assertIn(f'hx-post="/chats/{chat.id}/delete"', side)
+        self.assertIn("hx-confirm=", side)
+
+    def test_only_the_open_chat_is_marked_open(self):
+        first, second = self.saved_chat(chat_id="2026-11-01-0900-aaaa"), self.saved_chat(chat_id="2026-11-02-0900-bbbb")
+        page = self.page(f"/chats/{first.id}")
+        self.assertEqual(page.count('hx-vals=\'{"open": "1"}\''), 1)
+        self.assertIn(f'href="/chats/{second.id}"', page)
+
+    def test_new_chat_page_has_no_pencil(self):
+        self.assertNotIn("/rename", self.page("/chats/new"))
+
+    def test_confirm_text_names_the_chat_safely(self):
+        chat = self.saved_chat(text='a "quoted" <b> name')
+        page = self.page(f"/chats/{chat.id}")
+        self.assertNotIn('a "quoted" <b>', page)
+        self.assertIn("hx-confirm=\"Delete “a &#34;quoted&#34; &lt;b&gt; name”", page)
+
+    def test_rename(self):
+        chat = self.saved_chat()
+        response = self.rename(chat, "  Sunday pies ")
+        self.assertEqual(response.headers["HX-Redirect"], f"/chats/{chat.id}")
+        saved = store.load(chat.id, self.dir)
+        self.assertEqual(saved.title, "Sunday pies")
+        self.assertEqual(saved.updated, chat.updated)   # doesn't move up the list
+        self.assertEqual(len(saved.messages), 2)
+
+    def test_a_renamed_chat_keeps_its_name_after_more_messages(self):
+        chat = self.saved_chat()
+        self.rename(chat)
+        saved = store.load(chat.id, self.dir)
+        saved.add_user("another message")
+        self.assertEqual(saved.title, "Sunday pies")
+
+    def test_rename_is_escaped(self):
+        chat = self.saved_chat()
+        self.rename(chat, '"><script>alert(1)</script>')
+        self.assertNotIn("<script>alert", self.page(f"/chats/{chat.id}"))
+
+    def test_bad_names_are_refused(self):
+        chat = self.saved_chat()
+        for title in ("", "   ", "x" * (MAX_TITLE_CHARS + 1)):
+            with self.subTest(len(title)):
+                self.assertEqual(self.rename(chat, title).status_code, 400)
+
+    def test_deleting_the_open_chat_leaves_it(self):
+        chat = self.saved_chat()
+        response = self.client.post(f"/chats/{chat.id}/delete", data={"open": "1"})
+        self.assertEqual(response.headers["HX-Redirect"], "/")
+        self.assertEqual(store.list_chats(self.dir), [])
+        self.assertEqual(self.client.get(f"/chats/{chat.id}").status_code, 404)
+
+    def test_deleting_another_chat_only_removes_its_row(self):
+        chat = self.saved_chat()
+        response = self.client.post(f"/chats/{chat.id}/delete")
+        self.assertEqual((response.status_code, response.get_data()), (200, b""))
+        self.assertNotIn("HX-Redirect", response.headers)
+        self.assertEqual(store.list_chats(self.dir), [])
+
+    def test_both_wait_for_a_reply_in_progress(self):
+        chat = self.saved_chat(reply=None)
+        self.working_on(chat)
+        self.assertEqual(self.rename(chat).status_code, 409)
+        self.assertEqual(self.client.post(f"/chats/{chat.id}/delete").status_code, 409)
+        self.assertEqual(store.load(chat.id, self.dir).title, chat.title)
+
+    def test_another_accounts_chat_is_untouchable(self):
+        accounts.set_password("tester", PASSWORD, self.users)
+        hers = self.saved_chat()
+        other = self.app.test_client()
+        self.sign_in(other, "tester")
+        self.assertEqual(other.post(f"/chats/{hers.id}/rename", data={"title": "x"}).status_code, 404)
+        self.assertEqual(other.post(f"/chats/{hers.id}/delete").status_code, 404)
+        self.assertEqual(store.load(hers.id, self.dir).title, hers.title)
+
+    def test_changes_need_post(self):
+        chat = self.saved_chat()
+        self.assertEqual(self.client.get(f"/chats/{chat.id}/delete").status_code, 405)
+
+
 class HalfAndHalfTest(unittest.TestCase):
     def test_it_is_one_ingredient(self):
         for text in ("half and half", "Half And Half", "half-and-half"):
@@ -470,9 +574,12 @@ class SignInTest(WebCase):
         self.assertEqual(self.sign_in(name=" LEVI ").status_code, 302)
 
     def test_wrong_password_and_unknown_name_look_the_same(self):
+        def without_token(response):    # the form token has the time in it
+            return re.sub(r'value="[^"]+"', "", response.get_data(as_text=True))
+
         wrong = self.sign_in(password="nope nope")
         unknown = self.sign_in(name="nobody")
-        self.assertEqual((wrong.status_code, wrong.get_data()), (401, unknown.get_data()))
+        self.assertEqual((wrong.status_code, without_token(wrong)), (401, without_token(unknown)))
         self.assertEqual(unknown.status_code, 401)
 
     def test_repeated_failures_wait_even_with_the_right_password(self):

@@ -47,6 +47,13 @@ document.addEventListener("htmx:afterRequest", function (event) {
   if (event.detail.successful) {
     showSendError("");
     if (fromMessageBox && !isTouch) document.getElementById("message").focus();
+  } else if (event.detail.xhr?.status === 409) {
+    // On a phone the chat list is its own screen, where the note can't be seen.
+    const busy = "This chat is still being answered. Try again when the reply is done.";
+    if (event.target.closest?.("#chat-list")) window.alert(busy);
+    else showSendError(busy);
+  } else if (event.target.closest?.("#chat-list")) {
+    window.alert("That didn't go through. Check your connection and try again.");
   } else if (fromMessageBox) {
     showSendError("That didn't send, but your message is still in the box. " +
                   "Check your connection and press Send again. If it keeps happening, reload the page.");
@@ -55,6 +62,15 @@ document.addEventListener("htmx:afterRequest", function (event) {
                   "If it keeps happening, reload the page.");
   }
 });
+
+// Clicking the pencil: have the name selected, ready to type over. "toggle"
+// doesn't travel up the page like most events, so this listens with
+// capture (the true at the end), which sees it on the way down.
+document.addEventListener("toggle", function (event) {
+  if (event.target.matches?.(".rename") && event.target.open) {
+    event.target.querySelector("input").select();
+  }
+}, true);
 
 // When a chat opens, start at its latest message and be ready to type.
 // A URL ending in #chat-list is the phone's chat list screen: leave it.
