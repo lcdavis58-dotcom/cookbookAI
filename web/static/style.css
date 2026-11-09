@@ -217,7 +217,12 @@ small {
 #composer textarea {
   flex: 1;
   min-width: 0;
+  max-height: 40dvh;            /* app.js grows the box up to this */
   resize: none;
+}
+
+#send-error {
+  margin: 0;
 }
 
 /* ---- Forms ---- */

@@ -55,6 +55,7 @@
     {% endif %}
   </div>
 
+  <p id="send-error" role="alert" hidden></p>
   <form id="composer"
         hx-post="{{ url_for('chats.send', chat_id=chat.id) if chat else url_for('chats.create') }}"
         hx-target="#status"

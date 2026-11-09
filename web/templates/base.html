@@ -7,6 +7,7 @@
   <title>{% block title %}Cookbook{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body {% block body_attributes %}{% endblock %}>
   {% block body %}{% endblock %}

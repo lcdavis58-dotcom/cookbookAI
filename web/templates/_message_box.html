@@ -1,2 +1,3 @@
-<textarea id="message" name="message" rows="3" maxlength="{{ max_message_chars }}" required
+<textarea id="message" name="message" rows="1" maxlength="{{ max_message_chars }}" required
+          placeholder="Ask about a recipe, scale one, or list what you have"
           aria-label="Your message" {% if oob %}hx-swap-oob="true"{% endif %}></textarea>

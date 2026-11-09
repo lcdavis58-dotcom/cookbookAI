@@ -108,9 +108,17 @@ class ViewingTest(WebCase):
                     self.assertEqual(self.client.get(f"/chats/{chat_id}").status_code, 404)
             load.assert_not_called()
 
-    def test_stylesheet_is_linked_and_served(self):
-        self.assertIn('href="/static/style.css"', self.page("/"))
-        self.assertEqual(self.client.get("/static/style.css").status_code, 200)
+    def test_stylesheet_and_scripts_are_linked_and_served(self):
+        page = self.page("/")
+        for link, url in (("href", "/static/style.css"), ("src", "/static/htmx.min.js"), ("src", "/static/app.js")):
+            with self.subTest(url):
+                self.assertIn(f'{link}="{url}"', page)
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_page_has_what_the_message_box_script_needs(self):
+        page = self.page("/")
+        for element in ('id="message"', 'id="send"', 'id="composer"', 'id="send-error"'):
+            self.assertIn(element, page)
 
     def test_missing_chat_is_not_found(self):
         self.assertEqual(self.client.get("/chats/2026-11-01-0900-aaaa").status_code, 404)
