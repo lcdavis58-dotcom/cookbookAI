@@ -4,12 +4,22 @@ as the book's exact text; several are listed to pick from; anything else
 goes to the model with the closest book excerpts. See query.py.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from common import cli, models
 from query_utils.recipe_matching import extract_title, semantic_top_recipe_guess
 from query_utils.retrieval import candidate_text, retrieve, within_distance
-from query_utils.title_lookup import find_recipes
+from query_utils.title_lookup import find_recipes, list_titles, load_candidates
+
+DID_YOU_MEAN = "I couldn't find a recipe by exactly that name. Did you mean one of these?"
+# Asking to see a recipe, as opposed to asking about something. "Show me
+# how to ..." is a technique, not a recipe's name.
+WANTS_RECIPE_RE = re.compile(r"^\s*(?:(?:no|ok(?:ay)?|actually|and|so|please)[,\s]+)*"
+                             r"(?:show\s+me(?!\s+how\b)|(?:a\s+|the\s+)?recipe\s+for|"
+                             r"how\s+(?:do|would|should|can)\s+i\s+make|how\s+to\s+make|find(?:\s+me)?|give\s+me|"
+                             r"pull\s+up|open|let\s+me\s+see|can\s+i\s+see|i\s+want\s+to\s+make|"
+                             r"i'?d\s+like\s+to\s+make|look\s+up)\b", re.I)
 
 # How many of the retrieved chunks get pasted into the prompt if we fall
 # through to generation. Kept small, a bigger prompt directly costs more
@@ -72,6 +82,7 @@ class AskResult:
     sources: list = field(default_factory=list)
     generation_time: float = 0.0
     warnings: list = field(default_factory=list)
+    heading: str = ""               # for "choices", when it isn't the usual "which one?"
 
 
 def build_context(hits):
@@ -97,10 +108,13 @@ def run(question):
     relevant = within_distance(hits)
     found, source = find_recipes(question, hits)
     # Only a title the question names in full is shown directly. A near
-    # miss ("partial") goes to the model with the closest chunks, since a
+    # miss ("partial") is offered if the recipe is what's being asked for.
+    # Otherwise it goes to the model with the closest chunks, since a
     # question can mention a dish in passing ("what goes with banana
     # bread?") without asking for that recipe.
     header_matches = found.matches if found.kind == "match" else []
+    if found.kind == "partial" and WANTS_RECIPE_RE.search(question):
+        return AskResult("choices", question, choices=found.matches, more=found.more, heading=DID_YOU_MEAN)
 
     # Diagnostic comparison, not used for the actual decision below.
     # Prints what a pure-embedding-distance approach would have guessed,
@@ -129,7 +143,10 @@ def run(question):
     # mentions, "similar to" style questions, or content_type="unknown"
     # books that have no recipe-aware chunking profile. Only the closest
     # LLM_CONTEXT_K hits get sent, keeping the prompt (and generation time)
-    # small even though we searched more broadly above.
+    # small even though we searched more broadly above. A book the
+    # question names is the only one it's answered from.
+    if found.books:
+        relevant = [h for h in relevant if h["book"] in found.books]
     if not relevant:
         return AskResult("nothing", question, warnings=warnings)
     llm_hits = relevant[:LLM_CONTEXT_K]
@@ -139,6 +156,16 @@ def run(question):
     answer, seconds = _answer(user_prompt)
     return AskResult("answer", question, answer=answer, sources=llm_hits,
                      generation_time=seconds, warnings=warnings)
+
+
+def list_recipes(what, question):
+    """Every recipe with what ("pumpkin pie") in its title, by book."""
+    candidates, _ = load_candidates([])
+    found = list_titles(what, question, candidates)
+    if not found:
+        return AskResult("nothing", question)
+    plural = "" if len(found) == 1 else "s"
+    return AskResult("choices", question, choices=found, heading=f"You have {len(found)} {what.strip()} recipe{plural}:")
 
 
 def _answer(user_prompt):
@@ -193,7 +220,8 @@ def render(result):
     elif result.kind == "choices":
         choices = result.choices
         total = len(choices) + result.more
-        lines.append(f"I found {total} recipes matching \"{result.question}\". Which one did you mean?\n")
+        lines.append((result.heading or f"I found {total} recipes matching \"{result.question}\". "
+                                         "Which one did you mean?") + "\n")
         lines += [f"  {i}. {c.title}  ({c.book}, {page_note(c)})" for i, c in enumerate(choices, 1)]
         if result.more:
             lines.append(f"  ...and {result.more} more.")

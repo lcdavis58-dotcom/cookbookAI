@@ -30,6 +30,8 @@ def run_route(router, route):
             return ask.show(route.recipe, route.request)
         if route.mode == "about":
             return ask.about(route.recipe, route.request)
+        if route.mode == "list":
+            return ask.list_recipes(route.find_text, route.request)
         return ask.run(route.find_text)
     if route.action == "scale":
         if route.mode == "find":

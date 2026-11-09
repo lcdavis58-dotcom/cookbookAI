@@ -92,6 +92,17 @@ MATCH_REMOVE_RE = re.compile(r"^\s*(?:(?:ok(?:ay)?|actually|oh|wait|and|so),?\s+
                              r"(?:without|remove|minus|take\s+out|drop|forget(?:\s+about)?|skip|leave\s+out|"
                              r"scratch|i\s+don'?t\s+have(?:\s+any)?|i'?m\s+out\s+of|no\s+more)\s+(.+?)"
                              r"\s*[.!?]?\s*$", re.I)
+# Asking for every recipe of something: "what pumpkin pie recipes do i
+# have". A plural is what makes "show me pumpkin pie recipes" a list and
+# "show me a pumpkin pie recipe" a request for one.
+LIST_RES = tuple(re.compile(p, re.I) for p in (
+    r"^\s*(?:(?:tell|show)\s+me\s+|list\s+)?(?:what|which)\s+(?:kinds?\s+of\s+)?(.+?)\s+recipes?\s+"
+    r"(?:do\s+|did\s+)?(?:i|we)\s+(?:have|got|own)\b",
+    r"^\s*(?:do|did)\s+(?:i|we)\s+have\s+(?:any|some)\s+(.+?)\s+recipes\b",
+    r"^\s*(?:show|list|give|find)(?:\s+me)?\s+(?:all|every)(?:\s+of)?(?:\s+(?:the|my))?\s+(.+?)\s+recipes?\b",
+    r"^\s*(?:show(?:\s+me)?|list)\s+(?:(?:the|my)\s+)?(.+?)\s+recipes\b",
+    r"^\s*all\s+(?:the\s+|my\s+)?(.+?)\s+recipes\s*[.!?]?\s*$",
+))
 _LEADING_RE = re.compile(r"^\s*(?:with|the|my|some|any|a|an|also)\s+", re.I)
 _TRAILING_RE = re.compile(r"\s+(?:too|as\s+well|also|instead)\s*$", re.I)
 
@@ -102,7 +113,8 @@ class Route:
         action  "ask", "scale", "match", or "reply" (just say text, and
                 wait on pending if given)
         mode    ask: "find" (look up find_text), "show" (recipe),
-                "about" (a question about recipe)
+                "about" (a question about recipe), "list" (every recipe
+                with find_text in its title)
                 scale: "find" (look up find_text, then scale), "recipe"
                 match: "run"
     request is what the action is asked (the scaling request, the
@@ -336,6 +348,11 @@ class Router:
             if scale_cues(message):
                 return self.scale_route("rule", found, message, f"#{n}")
             return Route("ask", "rule", f"show #{n}", mode="show", recipe=found, request=message)
+
+        for pattern in LIST_RES:
+            m = pattern.match(message)
+            if m:
+                return Route("ask", "rule", "list", mode="list", find_text=m.group(1), request=message)
 
         if current and focus.scale and ORIGINAL_RE.search(message) and not named_one \
                 and detect_direct_multiplier(message) is None and not is_question(message):

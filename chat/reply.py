@@ -25,7 +25,8 @@ def ask_reply(result):
         lines += [f"{c.title}, from {c.book} ({ask.page_note(c)}):\n", result.text]
     elif result.kind == "choices":
         total = len(result.choices) + result.more
-        lines += [f"I found {total} recipes for that. Which one?\n", *_numbered(result.choices, result.more),
+        lines += [(result.heading or f"I found {total} recipes for that. Which one?") + "\n",
+                  *_numbered(result.choices, result.more),
                   f"\n{PICK_HINT}"]
     elif result.kind == "answer":
         sources = []

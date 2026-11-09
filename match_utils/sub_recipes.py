@@ -157,7 +157,7 @@ class BookLinker:
         pieces = _pieces(line)
         ids, how, kinds = [], None, set()
         for piece in pieces:
-            result = lookup(piece, others)
+            result = lookup(piece, others, loose=False)
             if result.kind == "match":
                 ids += [c.key for c in result.matches]
             elif result.kind == "partial" and not kinds_of(piece, self.kinds):
@@ -178,7 +178,7 @@ class BookLinker:
         if not ids:
             # A title with a comma of its own ("Fresh Cheese, the Easy
             # Way") is cut short by short_name; the whole line names it.
-            whole = lookup(re.sub(r"\([^)]*\)", " ", line), others)
+            whole = lookup(re.sub(r"\([^)]*\)", " ", line), others, loose=False)
             if whole.kind == "match" and len(whole.matches) == 1:
                 ids.append(whole.matches[0].key)
         if ids:

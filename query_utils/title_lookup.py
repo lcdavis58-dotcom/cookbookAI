@@ -31,6 +31,11 @@ A book named in the question ("from dessert persn", "from sfah") limits
 the search to that book's recipes; see find_books for how forgiving
 that is.
 
+What a person types is read more loosely than the links made at ingest
+(loose=True): a word counts as its everyday equivalents ("crust" for a
+title's "Dough", SAME_WORDS), and a request that's just the name of a
+general kind of recipe ("pie crust") means every recipe of that kind.
+
 lookup() returns one of:
     "match"     titles whose core words are all in the question, at the
                 best score: the question names them
@@ -67,6 +72,14 @@ REQUEST_WORDS = {"double", "doubled", "triple", "tripled", "quadruple", "half", 
                  "quarter", "scale", "scaled", "recipe", "batch", "make", "making", "need", "want",
                  "please", "people", "serving", "servings", "serve", "serves", "feed", "feeds",
                  "only", "have", "can", "how", "what", "much", "many", "show", "find"}
+
+# Words that say what's wanted without naming a dish, on top of
+# REQUEST_WORDS: "show me some pie crust recipes".
+ASKING_WORDS = REQUEST_WORDS | {"me", "some", "any", "all", "every", "give", "list", "get", "good"}
+
+# Words a person uses interchangeably in a recipe's name: "all butter
+# pie crust" is what The Book On Pie calls "All-Buttah Pie Dough".
+SAME_WORDS = ({"crust", "dough", "pastry"}, {"butter", "buttah"})
 
 # A shortened or misspelled book name only counts right after one of
 # these ("lemon curd from dessert persn"); see find_books.
@@ -394,13 +407,63 @@ def _question_forms(words, vocabulary):
     return forms, typos
 
 
-def lookup(question, candidates, nearby=None):
+def _with_same_words(forms):
+    return set(forms).union(*(group for group in SAME_WORDS if group & set(forms)))
+
+
+def _dish_words(words):
+    """The words naming a dish, without the ones just asking for it."""
+    return [w for w in words if not word_forms(w) & ASKING_WORDS]
+
+
+def _kind_recipes(words, candidates):
+    """Every recipe of a general kind, when the words are just its name
+    ("pie crust"), in book order; empty otherwise."""
+    from match_utils.sub_recipes import load_kinds  # imported late: it imports this module
+
+    def same(name):
+        tokens = title_tokens(name)
+        return len(tokens) == len(words) and all(
+            word_forms(a) & _with_same_words(word_forms(b)) for a, b in zip(tokens, words))
+
+    words = _dish_words(words)
+    for kind, names in load_kinds().items():
+        if words and any(same(name) for name in names):
+            return sorted((c for c in candidates if kind in ((c.payload or {}).get("kinds") or [])),
+                          key=lambda c: (c.book, c.title))
+    return []
+
+
+def list_titles(what, question, candidates):
+    """Every recipe whose title has all the words of what ("pumpkin pie"),
+    or that's of the kind what names, by book. A book named anywhere in
+    the question limits it to that book."""
+    title_words = {form for c in candidates for core, extra in c.variants
+                   for w in core + extra for form in word_forms(w)}
+    named_books, _ = find_books(question, {c.book for c in candidates}, title_words)
+    in_books = [c for c in candidates if c.book in named_books] or candidates
+    words = list(dict.fromkeys(_dish_words(title_tokens(find_books(what, {c.book for c in candidates}, title_words)[1]))))
+    if not words:
+        return []
+
+    def has_all(candidate):
+        return any(all(_with_same_words(word_forms(w)) & {f for t in core + extra for f in word_forms(t)}
+                       for w in words)
+                   for core, extra in candidate.variants)
+
+    found = {c.key: c for c in _kind_recipes(words, in_books)}
+    found.update((c.key, c) for c in in_books if has_all(c))
+    return sorted(found.values(), key=lambda c: (c.book, c.title))
+
+
+def lookup(question, candidates, nearby=None, loose=True):
     """Which candidates the question names. See the module docstring.
 
     nearby, when given, is {candidate key: rank} from the vector search
     (0 = the closest chunk), used to order titles that match equally
     well, so "scale the brownies, I only have 2 eggs" lists brownies
-    before egg dishes."""
+    before egg dishes. loose is for what a person typed; linking recipes
+    at ingest turns it off."""
     nearby = nearby or {}
     title_words = {form for c in candidates for core, extra in c.variants
                    for w in core + extra for form in word_forms(w)}
@@ -421,6 +484,11 @@ def lookup(question, candidates, nearby=None):
     words = list(dict.fromkeys(title_tokens(cleaned)))
     question_forms, typos = _question_forms(words, vocabulary)
     guess_forms, _ = _question_forms([w for w in words if w not in REQUEST_WORDS], vocabulary)
+    if loose:
+        question_forms, guess_forms = _with_same_words(question_forms), _with_same_words(guess_forms)
+        of_kind = _kind_recipes(words, candidates)
+        if of_kind:
+            return LookupResult("match", of_kind, 0, typos, named_books)
 
     def order(scored):
         # Exact titles first, then the ones with the fewest words the
