@@ -147,10 +147,12 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- Use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
+- **1.0.1:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
+- **1.0.2:** stop reading some sentences as ingredient lists or scaling requests
+- **1.1.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together
+- **1.2.0:** show chat replies word by word, lay recipes out more readably on the website
+- **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
-- Show chat replies word by word on the website
-- Lay recipes out more readably on the website
 
 ## Note
 
