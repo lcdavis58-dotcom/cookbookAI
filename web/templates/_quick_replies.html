@@ -1,0 +1,40 @@
+{# Buttons under the latest reply. Each sends an ordinary chat message,
+   so tapping does exactly what typing it would. #}
+{% set url = url_for('chats.send', chat_id=chat.id) %}
+{% macro tap(url, label, message, class="tap", name="") %}
+<button type="button" class="{{ class }}"
+        hx-post="{{ url }}"
+        hx-vals='{{ {"message": message} | tojson }}'
+        {% if name %}aria-label="{{ name }}" title="{{ name }}"{% endif %}>{{ label }}</button>
+{% endmacro %}
+
+<div class="quick" hx-target="#status" hx-swap="outerHTML show:window:bottom">
+  {% if status.quick.numbers %}
+  <div class="quick-row">
+    {% for n, recipe in status.quick.numbers %}
+      {{ tap(url, n, n | string, name=recipe.title ~ ", " ~ recipe.book) }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if status.quick.batches %}
+  <div class="quick-row">
+    {% for batch in status.quick.batches %}
+      {{ tap(url, batch, batch) }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if status.quick.have %}
+  <div class="quick-row">
+    {% for item in status.quick.have %}
+      {{ tap(url, item ~ " ✕", "without " ~ item, class="tag", name="Remove " ~ item) }}
+    {% endfor %}
+  </div>
+  <form id="add-ingredient" class="quick-row" hx-post="{{ url }}">
+    <input name="add" maxlength="200" required autocomplete="off"
+           placeholder="Add an ingredient" aria-label="Add an ingredient">
+    <button type="submit" class="tap">Add</button>
+  </form>
+  {% endif %}
+</div>

@@ -19,6 +19,6 @@
           hx-swap="outerHTML">Answer it now</button>
 </div>
 {% else %}
-<div id="status"></div>
+<div id="status">{% if status and status.quick %}{% include "_quick_replies.html" %}{% endif %}</div>
 {% endif %}
 {% if oob %}{% include "_send_button.html" %}{% endif %}

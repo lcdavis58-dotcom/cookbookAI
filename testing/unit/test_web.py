@@ -19,9 +19,10 @@ from unittest import mock
 from testing.unit.test_chat_router import CANDIDATES  # (also stubs chromadb/ollama)
 
 from chat import store  # noqa: E402
-from chat.state import ChatState, RecipeRef  # noqa: E402
+from chat.state import ChatState, Numbered, Pending, RecipeRef  # noqa: E402
 from common import accounts, models  # noqa: E402
 from common.config import MODEL_TIMEOUT  # noqa: E402
+from match_utils.matching import parse_have  # noqa: E402
 from web import create_app  # noqa: E402
 from web.auth import FAILURE_LIMIT, WAIT_SECONDS, Throttle  # noqa: E402
 from web.routes import MAX_MESSAGE_CHARS  # noqa: E402
@@ -113,7 +114,8 @@ class ViewingTest(WebCase):
         for link, url in (("href", "/static/style.css"), ("src", "/static/htmx.min.js"), ("src", "/static/app.js")):
             with self.subTest(url):
                 self.assertIn(f'{link}="{url}"', page)
-                self.assertEqual(self.client.get(url).status_code, 200)
+                with self.client.get(url) as response:
+                    self.assertEqual(response.status_code, 200)
 
     def test_page_has_what_the_message_box_script_needs(self):
         page = self.page("/")
@@ -180,7 +182,87 @@ class SendingTest(WebCase):
         self.addCleanup(self.release.set)
 
     def send(self, chat, text="how long does it chill?"):
-        return self.client.post(f"/chats/{chat.id}/messages", data={"message": text})
+        return self.client.post(f"/chats/{chat.id}/messages", data={"message": text},
+                                headers={"HX-Trigger": "composer"})
+
+    def after_match(self, have=("pecan", "half and half")):
+        chat = self.saved_chat(reply=None)
+        chat.add_reply("You have: ...", action="match")
+        chat.focus.have = list(have)
+        chat.focus.numbered = Numbered("match", [RecipeRef("a-1", "Book A", "Pie <One>"),
+                                                 RecipeRef("a-2", "Book A", "It's Pie Two")])
+        store.save(chat, self.dir)
+        return chat
+
+    def test_match_results_get_numbers_and_ingredient_tags(self):
+        page = self.page(f"/chats/{self.after_match().id}")
+        self.assertRegex(page, r"""hx-vals='\{"message": "1"\}'""")
+        self.assertRegex(page, r"""hx-vals='\{"message": "2"\}'""")
+        self.assertIn("without half and half", page)
+        self.assertIn('aria-label="Remove pecan"', page)
+        self.assertIn('name="add"', page)
+        self.assertIn("Pie &lt;One&gt;", page)
+
+    def test_tapped_text_cannot_break_out_of_its_attribute(self):
+        chat = self.after_match(have=["it's <b>"])
+        page = self.page(f"/chats/{chat.id}")
+        self.assertNotIn("<b> ✕", page)
+        tapped = json.loads(re.search(r"hx-vals='(\{[^']*without[^']*\})'", page).group(1))
+        self.assertEqual(tapped["message"], "without it's <b>")
+
+    def test_which_one_list_gets_numbers_only(self):
+        chat = self.after_match()
+        chat.focus.pending = Pending("pick_recipe", "scale", "double the pie")
+        store.save(chat, self.dir)
+        page = self.page(f"/chats/{chat.id}")
+        self.assertRegex(page, r"""hx-vals='\{"message": "1"\}'""")
+        self.assertNotIn("without", page)
+
+    def test_batch_question_gets_batch_buttons(self):
+        chat = self.saved_chat()
+        chat.focus.pending = Pending("pick_batch", "scale", "double it", ["Full Batch", "Half Batch"])
+        store.save(chat, self.dir)
+        page = self.page(f"/chats/{chat.id}")
+        self.assertRegex(page, r"""hx-vals='\{"message": "Half Batch"\}'""")
+
+    def test_old_results_are_not_tappable_after_moving_on(self):
+        chat = self.after_match()
+        chat.add_user("how long does it chill?")
+        chat.add_reply("About an hour.", action="ask")
+        store.save(chat, self.dir)
+        self.assertNotIn("hx-vals", self.page(f"/chats/{chat.id}"))
+
+    def test_nothing_tappable_while_working(self):
+        chat = self.after_match()
+        self.hold()
+        self.send(chat)
+        self.assertNotIn("hx-vals", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
+
+    def test_finished_reply_includes_its_buttons(self):
+        chat = self.after_match()
+        self.answers.work = lambda directory, chat_id: self._reply_match(directory, chat_id)
+        self.send(chat, "add butter")
+        self.answers.join()
+        self.assertIn("without pecan", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
+
+    def _reply_match(self, directory, chat_id):
+        chat = store.load(chat_id, directory)
+        chat.add_reply("You have: ...", action="match")
+        store.save(chat, directory)
+
+    def test_tap_sends_the_message_and_leaves_the_box_alone(self):
+        chat = self.after_match()
+        self.hold()
+        body = self.client.post(f"/chats/{chat.id}/messages", data={"message": "1"}).get_data(as_text=True)
+        self.assertEqual(self.saved(chat).unanswered(), "1")
+        self.assertNotIn("<textarea", body)
+
+    def test_add_box_sends_add(self):
+        chat = self.after_match()
+        self.hold()
+        self.client.post(f"/chats/{chat.id}/messages", data={"add": " butter "},
+                         headers={"HX-Trigger": "add-ingredient"})
+        self.assertEqual(self.saved(chat).unanswered(), "add butter")
 
     def saved(self, chat):
         return store.load(chat.id, self.dir)
@@ -327,6 +409,16 @@ class SendingTest(WebCase):
         response = self.client.get(f"/chats/{chat.id}/status", headers={"HX-Request": "true"})
         self.assertEqual(response.status_code, 204)
         self.assertEqual(response.headers["HX-Redirect"], "/login")
+
+
+class HalfAndHalfTest(unittest.TestCase):
+    def test_it_is_one_ingredient(self):
+        for text in ("half and half", "Half And Half", "half-and-half"):
+            with self.subTest(text):
+                self.assertEqual(parse_have(f"pumpkin, {text}"), ["pumpkin", "half-and-half"])
+
+    def test_other_ands_still_split(self):
+        self.assertEqual(parse_have("pecans and lemons"), ["pecan", "lemon"])
 
 
 class ModelTimeoutTest(unittest.TestCase):

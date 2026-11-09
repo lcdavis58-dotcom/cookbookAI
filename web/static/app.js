@@ -41,14 +41,18 @@ document.addEventListener("input", function (event) {
 
 // HTMX announces each finished request with this event.
 document.addEventListener("htmx:afterRequest", function (event) {
-  if (event.target.id !== "composer") return; // only the message form
+  if (event.detail.requestConfig.verb !== "post") return; // not the status checks
 
+  const fromMessageBox = event.target.id === "composer";
   if (event.detail.successful) {
     showSendError("");
-    if (!isTouch) document.getElementById("message").focus();
-  } else {
+    if (fromMessageBox && !isTouch) document.getElementById("message").focus();
+  } else if (fromMessageBox) {
     showSendError("That didn't send, but your message is still in the box. " +
                   "Check your connection and press Send again. If it keeps happening, reload the page.");
+  } else {
+    showSendError("That didn't go through. Check your connection and try again. " +
+                  "If it keeps happening, reload the page.");
   }
 });
 

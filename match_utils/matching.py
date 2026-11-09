@@ -79,6 +79,8 @@ def parse_have(text):
         item = re.sub(r"^\s*(?:and|&)\s+|^\s*[\d½¼¾⅓⅔]+\s+", "", item.strip())
         if not item:
             continue
+        # One ingredient, however it's typed, and how the books spell it.
+        item = re.sub(r"\bhalf\s+and\s+half\b", "half-and-half", item, flags=re.I)
         name = normalize(item)[0]
         for piece in pieces(name, unmeasured=True):
             if piece and piece not in have:

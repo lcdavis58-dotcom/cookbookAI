@@ -70,12 +70,33 @@ def load_chat(chat_id):
 
 
 def message_text():
-    """The message in the form. HTMX doesn't show an error response, and
-    the box already refuses these, so this only stops hand-made requests."""
-    text = request.form.get("message", "").strip()
+    """The message in the form, or "add ..." from the ingredient box. The
+    page's own limits already refuse bad ones, so this only stops
+    hand-made requests."""
+    add = request.form.get("add", "").strip()
+    text = f"add {add}" if add else request.form.get("message", "").strip()
     if not text or len(text) > MAX_MESSAGE_CHARS:
         abort(400)
     return text
+
+
+def quick_replies(chat):
+    """What can be tapped under the latest reply, each sending the message
+    she could have typed:
+        numbers     (n, recipe) for a "which one?" list or match results
+        batches     the batch sizes it's asking her to pick from
+        have        the ingredients just searched, to remove or add to"""
+    if not chat.messages or chat.messages[-1].role != "assistant":
+        return {}
+    focus, action = chat.focus, chat.messages[-1].action
+    if focus.pending and focus.pending.kind == "pick_batch":
+        return {"batches": focus.pending.options}
+    numbered = list(enumerate(focus.numbered.items, 1)) if focus.numbered else []
+    if focus.pending and focus.pending.kind == "pick_recipe":
+        return {"numbers": numbered}
+    if action == "match" and not focus.pending and focus.have:
+        return {"numbers": numbered if focus.numbered.source == "match" else [], "have": focus.have}
+    return {}
 
 
 def status_of(chat_id):
@@ -87,7 +108,8 @@ def status_of(chat_id):
     return chat, {"working": seconds is not None,
                   "slow": seconds is not None and seconds > SLOW_AFTER_SECONDS,
                   "unanswered": chat.unanswered() is not None,
-                  "failure": answers().failure(chats_dir(), chat_id)}
+                  "failure": answers().failure(chats_dir(), chat_id),
+                  "quick": {} if seconds is not None else quick_replies(chat)}
 
 
 def status_response(chat_id, deliver_reply=False):
@@ -153,8 +175,10 @@ def send(chat_id):
     if not answers().submit(folder, chat_id, before=save):
         return status_response(chat_id)     # a reply is in progress; her text stays in the box
     chat, status = status_of(chat_id)
+    # Only the message form empties the message box: tapping a button
+    # mustn't lose something she was in the middle of typing.
     return render_template("_sent.html", chat=chat, status=status, oob=True, message=chat.messages[-1],
-                           number=len(chat.messages))
+                           number=len(chat.messages), clear_box=request.headers.get("HX-Trigger") == "composer")
 
 
 @bp.post("/chats/<chat_id:chat_id>/answer")
