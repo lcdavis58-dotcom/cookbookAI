@@ -3,9 +3,11 @@ The website: the same chat as chat.py, in a browser. This package only
 handles web requests and pages; everything about answering a message
 stays in chat/ and actions/.
 
+    answers.py      working out replies in the background
     auth.py         signing in and out
     routes.py       the chat URLs
     templates/      the pages
+    static/         files sent to the browser as they are
 """
 
 import os
@@ -19,6 +21,7 @@ from werkzeug.routing import BaseConverter
 from chat.terminal import when
 from common.config import CHATS_DIR, USERS_PATH, WEB_SECRET_PATH
 from web import auth
+from web.answers import Answers, answer_chat
 from web.routes import CHAT_ID, bp
 
 MAX_REQUEST_BYTES = 64 * 1024
@@ -71,6 +74,7 @@ def create_app(chats_dir=CHATS_DIR, users_path=USERS_PATH, secret_path=WEB_SECRE
     )
     app.url_map.converters["chat_id"] = ChatIdConverter
     app.jinja_env.filters["when"] = when
+    app.extensions["answers"] = Answers(answer_chat)
     CSRFProtect(app)
     auth.init_app(app)
     app.register_blueprint(auth.bp)

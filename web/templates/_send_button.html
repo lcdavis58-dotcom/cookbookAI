@@ -1,0 +1,2 @@
+<button id="send" type="submit" {% if oob %}hx-swap-oob="true"{% endif %}
+        {% if status and status.working %}disabled{% endif %}>Send</button>

@@ -1,0 +1,24 @@
+{# What follows the last message: a reply being worked on, or the offer
+   to answer a message that never got one. Empty the rest of the time. #}
+{% if reply %}
+  {% with message = reply %}{% include "_message.html" %}{% endwith %}
+{% endif %}
+{% if status and status.working %}
+<div id="status"
+     hx-get="{{ url_for('chats.status', chat_id=chat.id) }}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  {{ "Still working, this one's taking a while…" if status.slow else "Thinking…" }}
+</div>
+{% elif status and status.unanswered %}
+<div id="status">
+  <p>{{ status.failure or "This message didn't get an answer." }}</p>
+  <button type="button"
+          hx-post="{{ url_for('chats.answer', chat_id=chat.id) }}"
+          hx-target="#status"
+          hx-swap="outerHTML">Answer it now</button>
+</div>
+{% else %}
+<div id="status"></div>
+{% endif %}
+{% if oob %}{% include "_send_button.html" %}{% endif %}

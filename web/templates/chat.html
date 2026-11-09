@@ -2,9 +2,13 @@
 
 {% block title %}{{ chat.title if chat and chat.title else "Cookbook" }}{% endblock %}
 
+{# Every HTMX request from this page carries the form token. #}
+{% block body_attributes %}hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'{% endblock %}
+
 {% block body %}
 <nav id="chat-list">
   <h2>Chats</h2>
+  <p><a href="{{ url_for('chats.new') }}">New chat</a></p>
   {% if chats %}
   <ul>
     {% for c in chats %}
@@ -29,19 +33,29 @@
 </nav>
 
 <main>
-  {% if chat %}
-  <h1>{{ chat.title or "New chat" }}</h1>
-  <div id="messages">
-    {% for message in chat.messages %}
-      {% include "_message.html" %}
-    {% endfor %}
-  </div>
+  <h1>{{ chat.title if chat and chat.title else "New chat" }}</h1>
   {% if gone %}
   <p>Not in the books anymore, they were re-ingested: {{ gone | join(", ") }}.</p>
   {% endif %}
-  {% if chat.unanswered() %}
-  <p>This message didn't get an answer.</p>
-  {% endif %}
-  {% endif %}
+
+  <div id="messages">
+    {% if chat %}
+      {% for message in chat.messages %}
+        {% with number = loop.index %}{% include "_message.html" %}{% endwith %}
+      {% endfor %}
+      {% include "_status.html" %}
+    {% else %}
+      <div id="status"></div>
+    {% endif %}
+  </div>
+
+  <form id="composer"
+        hx-post="{{ url_for('chats.send', chat_id=chat.id) if chat else url_for('chats.create') }}"
+        hx-target="#status"
+        hx-swap="outerHTML show:window:bottom"
+        hx-disabled-elt="#send">
+    {% include "_message_box.html" %}
+    {% include "_send_button.html" %}
+  </form>
 </main>
 {% endblock %}

@@ -1,4 +1,4 @@
-<article class="message {{ message.role }}">
+<article id="m{{ number }}" class="message {{ message.role }}">
   <strong>{{ "You" if message.role == "user" else "Assistant" }}</strong>
   <pre>{{ message.text }}</pre>
 </article>

@@ -42,6 +42,9 @@ CHAT_MODEL = os.environ.get("CHAT_MODEL", "qwen2.5:7b")
 # one, which cost ~10s a switch. 8192 fits six recipe excerpts plus the
 # question, and qwen2.5:7b with it fits in 8 GB of GPU memory.
 CHAT_CONTEXT = int(os.environ.get("CHAT_CONTEXT", "8192"))
+# Seconds one model call may take before it's given up on, so a hung
+# model can't leave a chat waiting forever.
+MODEL_TIMEOUT = float(os.environ.get("MODEL_TIMEOUT", "300"))
 
 # Where the PDFs live. Defaults to the Pi; set the COOKBOOKS_DIR
 # environment variable to run ingest or the diagnostics on another

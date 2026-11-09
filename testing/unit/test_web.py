@@ -6,11 +6,13 @@ Run from app/:
     python3 -m unittest discover testing
 """
 
+import html
 import json
 import os
 import re
 import shutil
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -18,9 +20,11 @@ from testing.unit.test_chat_router import CANDIDATES  # (also stubs chromadb/oll
 
 from chat import store  # noqa: E402
 from chat.state import ChatState, RecipeRef  # noqa: E402
-from common import accounts  # noqa: E402
+from common import accounts, models  # noqa: E402
+from common.config import MODEL_TIMEOUT  # noqa: E402
 from web import create_app  # noqa: E402
 from web.auth import FAILURE_LIMIT, WAIT_SECONDS, Throttle  # noqa: E402
+from web.routes import MAX_MESSAGE_CHARS  # noqa: E402
 
 PASSWORD = "correct horse"
 
@@ -122,7 +126,7 @@ class ViewingTest(WebCase):
 
     def test_unanswered_message_is_noted(self):
         chat = self.saved_chat(reply=None)
-        self.assertIn("didn't get an answer", self.page(f"/chats/{chat.id}"))
+        self.assertIn("didn't get an answer", html.unescape(self.page(f"/chats/{chat.id}")))
 
     def test_viewing_does_not_save(self):
         chat = self.saved_chat()
@@ -136,6 +140,212 @@ class ViewingTest(WebCase):
         self.assertIn("Not in the books anymore", page)
         with open(path, encoding="utf-8") as f:
             self.assertEqual(json.load(f), before)
+
+
+class SendingTest(WebCase):
+    def setUp(self):
+        super().setUp()
+        self.sign_in()
+        self.dir = self.user_dir()
+        self.answers = self.app.extensions["answers"]
+        self.release = threading.Event()
+        self.release.set()
+        self.failure = None
+        self.answers.work = self.fake_work
+
+    def fake_work(self, directory, chat_id):
+        self.release.wait(5)
+        if self.failure:
+            raise self.failure
+        chat = store.load(chat_id, directory)
+        chat.add_reply(f"Reply to: {chat.unanswered()}")
+        store.save(chat, directory)
+
+    def hold(self):
+        """Keep the next reply in progress until the test is done with it."""
+        self.release.clear()
+        self.addCleanup(self.answers.join)
+        self.addCleanup(self.release.set)
+
+    def send(self, chat, text="how long does it chill?"):
+        return self.client.post(f"/chats/{chat.id}/messages", data={"message": text})
+
+    def saved(self, chat):
+        return store.load(chat.id, self.dir)
+
+    def test_first_message_makes_a_chat_and_opens_it(self):
+        response = self.client.post("/chats", data={"message": "double the cream"})
+        self.answers.join()
+        chats = store.list_chats(self.dir)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.headers["HX-Redirect"], f"/chats/{chats[0].id}")
+        self.assertEqual(chats[0].title, "double the cream")
+        self.assertEqual(chats[0].message_count, 2)
+
+    def test_send_returns_her_message_and_thinking(self):
+        chat = self.saved_chat()
+        self.hold()
+        body = self.send(chat, "<i>how long</i>").get_data(as_text=True)
+        self.assertIn("&lt;i&gt;how long", body)
+        self.assertIn('hx-trigger="every 2s"', body)
+        self.assertIn('id="m3"', body)
+        self.assertIn("Thinking", body)
+        self.assertRegex(body, r'<textarea[^>]*hx-swap-oob')
+        self.assertRegex(body, r'<button id="send"[^>]*hx-swap-oob="true"\s+disabled')
+
+    def test_her_message_is_saved_before_the_reply(self):
+        chat = self.saved_chat()
+        self.hold()
+        self.send(chat, "still here?")
+        self.assertEqual(self.saved(chat).unanswered(), "still here?")
+
+    def test_status_while_working_has_no_reply_and_keeps_checking(self):
+        chat = self.saved_chat()
+        self.hold()
+        self.send(chat)
+        body = self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True)
+        self.assertIn("Thinking", body)
+        self.assertNotIn("<article", body)
+
+    def test_status_says_when_it_is_slow(self):
+        chat = self.saved_chat()
+        self.hold()
+        self.send(chat)
+        with mock.patch("web.routes.SLOW_AFTER_SECONDS", -1):
+            self.assertIn("Still working", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
+
+    def test_finished_status_delivers_the_reply_once_and_stops_checking(self):
+        chat = self.saved_chat()
+        self.send(chat)
+        self.answers.join()
+        response = self.client.get(f"/chats/{chat.id}/status")
+        body = response.get_data(as_text=True)
+        self.assertIn("Reply to: how long does it chill?", body)
+        self.assertNotIn("every 2s", body)
+        self.assertEqual(response.headers["HX-Reswap"], "outerHTML show:#m4:top")
+        self.assertRegex(body, r'<button id="send"[^>]*hx-swap-oob="true"\s*>')
+
+    def test_a_second_message_waits_for_the_reply(self):
+        chat = self.saved_chat()
+        self.hold()
+        self.send(chat, "first")
+        body = self.send(chat, "second").get_data(as_text=True)
+        self.assertNotIn("second", body)
+        self.assertNotRegex(body, r"<textarea")     # what she typed stays in the box
+        self.assertEqual(self.saved(chat).unanswered(), "first")
+
+    def test_reloading_while_working_keeps_checking(self):
+        chat = self.saved_chat()
+        self.hold()
+        self.send(chat)
+        page = self.page(f"/chats/{chat.id}")
+        self.assertIn("every 2s", page)
+        self.assertNotIn("Answer it now", page)
+        self.assertRegex(page, r'<button id="send"[^>]*\s+disabled')
+
+    def test_page_offers_to_answer_after_a_restart(self):
+        chat = self.saved_chat(reply=None)
+        page = self.page(f"/chats/{chat.id}")
+        self.assertIn("Answer it now", page)
+        self.assertNotIn("every 2s", page)
+
+    def test_answer_button_answers(self):
+        chat = self.saved_chat(reply=None)
+        self.hold()
+        body = self.client.post(f"/chats/{chat.id}/answer").get_data(as_text=True)
+        self.assertIn("every 2s", body)
+        self.release.set()
+        self.answers.join()
+        self.assertIsNone(self.saved(chat).unanswered())
+        self.assertEqual(len(self.saved(chat).messages), 2)
+
+    def test_answer_button_on_an_answered_chat_shows_the_reply(self):
+        chat = self.saved_chat()
+        with mock.patch.object(self.answers, "submit") as submit:
+            body = self.client.post(f"/chats/{chat.id}/answer").get_data(as_text=True)
+        submit.assert_not_called()
+        self.assertIn("Scaling it.", body)
+
+    def test_failures_keep_the_message_and_offer_to_retry(self):
+        for error, text in ((ConnectionError("down"), "couldn't reach the model"),
+                            (TimeoutError("slow"), "took too long"),
+                            (ValueError("secret detail"), "Something went wrong")):
+            with self.subTest(text):
+                self.failure = error
+                chat = self.saved_chat(reply=None, chat_id=f"2026-11-01-0900-{len(text) % 10}abc")
+                self.client.post(f"/chats/{chat.id}/answer")
+                self.answers.join()
+                body = self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True)
+                self.assertIn(text, html.unescape(body))
+                self.assertIn("Answer it now", body)
+                self.assertNotIn("secret detail", body)
+                self.assertIsNotNone(self.saved(chat).unanswered())
+
+    def test_retry_clears_the_failure(self):
+        chat = self.saved_chat(reply=None)
+        self.failure = ConnectionError("down")
+        self.client.post(f"/chats/{chat.id}/answer")
+        self.answers.join()
+        self.failure = None
+        self.client.post(f"/chats/{chat.id}/answer")
+        self.answers.join()
+        self.assertIn("Reply to", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
+
+    def test_blank_or_huge_messages_are_refused(self):
+        chat = self.saved_chat()
+        for text in ("", "   \n ", "x" * (MAX_MESSAGE_CHARS + 1)):
+            with self.subTest(len(text)):
+                self.assertEqual(self.send(chat, text).status_code, 400)
+        self.assertEqual(len(self.saved(chat).messages), 2)
+
+    def test_another_accounts_chat_cannot_be_used(self):
+        accounts.set_password("tester", PASSWORD, self.users)
+        hers = self.saved_chat(text="private")
+        other = self.app.test_client()
+        self.sign_in(other, "tester")
+        for response in (other.post(f"/chats/{hers.id}/messages", data={"message": "hi"}),
+                         other.post(f"/chats/{hers.id}/answer"),
+                         other.get(f"/chats/{hers.id}/status")):
+            self.assertEqual(response.status_code, 404)
+        self.assertEqual(len(self.saved(hers).messages), 2)
+
+    def test_signed_out_htmx_request_goes_to_the_sign_in_page(self):
+        chat = self.saved_chat()
+        self.client.post("/logout")
+        response = self.client.get(f"/chats/{chat.id}/status", headers={"HX-Request": "true"})
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.headers["HX-Redirect"], "/login")
+
+
+class ModelTimeoutTest(unittest.TestCase):
+    def test_kinds_of_failure(self):
+        timeout = type("ReadTimeout", (Exception,), {})()
+        connect = type("ConnectError", (Exception,), {})()
+        self.assertTrue(models.is_timeout(timeout))
+        self.assertFalse(models.is_connection_error(timeout))
+        self.assertTrue(models.is_connection_error(connect))
+        self.assertFalse(models.is_timeout(connect))
+
+    def test_calls_have_a_time_limit(self):
+        with mock.patch("common.models._client", None), mock.patch("common.models.ollama") as ollama:
+            models.chat("test", [])
+        ollama.Client.assert_called_once_with(timeout=MODEL_TIMEOUT)
+
+
+class SecurityHtmxTest(WebCase):
+    config = {}
+
+    def test_chat_page_gives_htmx_the_token_and_it_is_accepted(self):
+        token = re.search(r'name="csrf_token" value="([^"]+)"', self.page("/login")).group(1)
+        self.client.post("/login", data={"username": "levi", "password": PASSWORD, "csrf_token": token})
+        chat = self.saved_chat()
+        self.app.extensions["answers"].work = lambda *_: None
+        self.assertEqual(self.client.post(f"/chats/{chat.id}/messages", data={"message": "hi"}).status_code, 400)
+        header = re.search(r"""hx-headers='\{"X-CSRFToken": "([^"]+)"\}'""", self.page(f"/chats/{chat.id}")).group(1)
+        response = self.client.post(f"/chats/{chat.id}/messages", data={"message": "hi"},
+                                    headers={"X-CSRFToken": header})
+        self.assertEqual(response.status_code, 200)
+        self.app.extensions["answers"].join()
 
 
 class SignInTest(WebCase):

@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
   <title>{% block title %}Cookbook{% endblock %}</title>
+  <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
 </head>
-<body>
+<body {% block body_attributes %}{% endblock %}>
   {% block body %}{% endblock %}
 </body>
 </html>

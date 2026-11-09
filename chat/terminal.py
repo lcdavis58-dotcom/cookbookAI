@@ -51,11 +51,6 @@ def when(stamp, now=None):
     return f"{then:%b} {then.day}"
 
 
-def is_connection_error(error):
-    """Ollama isn't running or can't be reached."""
-    return isinstance(error, ConnectionError) or type(error).__name__ in ("ConnectError", "ConnectTimeout")
-
-
 class Terminal:
     def __init__(self, read=input, write=print, directory=CHATS_DIR, candidates=None):
         self.read, self.write = read, write
@@ -163,9 +158,11 @@ class Terminal:
             self.write("(Stopped. Your message is saved: send it again, or reopen this chat to answer it.)")
             return
         except Exception as e:  # noqa: BLE001 -- the chat goes on, her message is saved
-            if is_connection_error(e):
+            if models.is_connection_error(e):
                 self.write("I couldn't reach the model. Is Ollama running? Your message is saved, "
                            "so you can send it again once it is.")
+            elif models.is_timeout(e):
+                self.write("The model took too long to answer. Your message is saved, so you can send it again.")
             else:
                 self.write(f"Something went wrong ({type(e).__name__}: {e}). Your message is saved.")
             if cli.DEBUG:

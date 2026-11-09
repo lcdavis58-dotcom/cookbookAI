@@ -9,7 +9,7 @@ import hmac
 import threading
 import time
 
-from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, make_response, redirect, render_template, request, session, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 
 from common import accounts
@@ -76,6 +76,12 @@ def load_user(session_id):
 
 @login_manager.unauthorized_handler
 def go_to_login():
+    if request.headers.get("HX-Request"):
+        # Otherwise HTMX would follow the redirect and put the sign-in
+        # page in the middle of the conversation.
+        response = make_response("", 204)
+        response.headers["HX-Redirect"] = url_for("auth.login")
+        return response
     return redirect(url_for("auth.login"))
 
 
