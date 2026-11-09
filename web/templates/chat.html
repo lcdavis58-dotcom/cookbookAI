@@ -21,6 +21,11 @@
   {% if broken %}
   <p><small>{{ broken }} saved chat{{ "s" if broken != 1 }} couldn't be read.</small></p>
   {% endif %}
+  <form method="post" action="{{ url_for('auth.logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <small>Signed in as {{ current_user.name }}</small>
+    <button type="submit">Sign out</button>
+  </form>
 </nav>
 
 <main>

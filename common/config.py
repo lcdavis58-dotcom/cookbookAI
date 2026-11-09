@@ -27,6 +27,10 @@ EXTRACT_DIR = os.environ.get("EXTRACT_DIR", os.path.join(DATA_DIR, "extracted"))
 # Saved chats (chat/store.py), one file each, in a folder of their own
 # so nothing else ends up mixed in with them. CHATS_DIR overrides it.
 CHATS_DIR = os.environ.get("CHATS_DIR", os.path.join(DATA_DIR, "chats"))
+# The website's accounts (common/accounts.py) and the key that signs its
+# login cookies (web/__init__.py). Both stay outside app/, never committed.
+USERS_PATH = os.environ.get("USERS_PATH", os.path.join(DATA_DIR, "users.json"))
+WEB_SECRET_PATH = os.environ.get("WEB_SECRET_PATH", os.path.join(DATA_DIR, "web_secret.key"))
 COLLECTION_NAME = "cookbooks"
 EMBED_MODEL = "nomic-embed-text"
 # The model for every chat-model job: answering, scaling, routing chat
