@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ chat.title if chat and chat.title else "Cookbook" }}{% endblock %}
+
+{% block body %}
+<nav id="chat-list">
+  <h2>Chats</h2>
+  {% if chats %}
+  <ul>
+    {% for c in chats %}
+    <li>
+      <a href="{{ url_for('chats.show', chat_id=c.id) }}"
+         {% if chat and c.id == chat.id %}aria-current="page"{% endif %}>{{ c.title or "New chat" }}</a>
+      <small>{{ c.updated | when }}</small>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No saved chats yet.</p>
+  {% endif %}
+  {% if broken %}
+  <p><small>{{ broken }} saved chat{{ "s" if broken != 1 }} couldn't be read.</small></p>
+  {% endif %}
+</nav>
+
+<main>
+  {% if chat %}
+  <h1>{{ chat.title or "New chat" }}</h1>
+  <div id="messages">
+    {% for message in chat.messages %}
+      {% include "_message.html" %}
+    {% endfor %}
+  </div>
+  {% if gone %}
+  <p>Not in the books anymore, they were re-ingested: {{ gone | join(", ") }}.</p>
+  {% endif %}
+  {% if chat.unanswered() %}
+  <p>This message didn't get an answer.</p>
+  {% endif %}
+  {% endif %}
+</main>
+{% endblock %}
