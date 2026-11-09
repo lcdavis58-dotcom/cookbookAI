@@ -3,11 +3,14 @@
 {% block title %}{{ chat.title if chat and chat.title else "Cookbook" }}{% endblock %}
 
 {# Every HTMX request from this page carries the form token. #}
-{% block body_attributes %}hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'{% endblock %}
+{% block body_attributes %}class="app" hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'{% endblock %}
 
 {% block body %}
 <nav id="chat-list">
-  <h2>Chats</h2>
+  <div class="chat-list-header">
+    <h2>Chats</h2>
+    <a class="close-chats" href="#">Back</a>
+  </div>
   <p><a href="{{ url_for('chats.new') }}">New chat</a></p>
   {% if chats %}
   <ul>
@@ -25,7 +28,7 @@
   {% if broken %}
   <p><small>{{ broken }} saved chat{{ "s" if broken != 1 }} couldn't be read.</small></p>
   {% endif %}
-  <form method="post" action="{{ url_for('auth.logout') }}">
+  <form class="sign-out" method="post" action="{{ url_for('auth.logout') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <small>Signed in as {{ current_user.name }}</small>
     <button type="submit">Sign out</button>
@@ -33,7 +36,10 @@
 </nav>
 
 <main>
-  <h1>{{ chat.title if chat and chat.title else "New chat" }}</h1>
+  <header class="chat-header">
+    <a class="to-chats" href="#chat-list">Chats</a>
+    <h1>{{ chat.title if chat and chat.title else "New chat" }}</h1>
+  </header>
   {% if gone %}
   <p>Not in the books anymore, they were re-ingested: {{ gone | join(", ") }}.</p>
   {% endif %}
