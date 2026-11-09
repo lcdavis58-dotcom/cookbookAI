@@ -1,6 +1,7 @@
 {
   "_comment": "Whole ingredients and the parts they cover when matching recipes to what someone has. Having the whole covers its parts (eggs cover egg yolk, egg white and egg wash; lemons cover lemon juice and zest), but a part never covers the whole: leftover yolks are not eggs. Names must match the normalized names in the recipe index (see match_utils/ingredient_names.py). Add families here as they come up.",
   "parts": {
+    "pumpkin": ["pumpkin puree", "pumpkin purée", "canned pumpkin puree", "canned pumpkin", "unsweetened pumpkin puree", "cooked pumpkin puree", "libby’s pumpkin puree"],
     "egg": ["egg yolk", "egg white", "egg wash"],
     "lemon": ["lemon juice", "lemon zest"],
     "meyer lemon": ["meyer lemon juice", "meyer lemon zest"],

@@ -221,7 +221,7 @@ def remember(state, action, request, result):
         focus.pending = None
     elif action == "match" and kind == "matches":
         from actions.match import SHOW_PER_SECTION  # what the list shows, numbered in that order
-        shown = [r for section in (result.ready, result.from_scratch, result.missing_one)
+        shown = [r for section in (result.ready, result.from_scratch, result.missing_some)
                  for r in section[:SHOW_PER_SECTION]]
         focus.have = list(result.have)
         focus.numbered = Numbered("match", [RecipeRef.from_entry(r["entry"]) for r in shown])

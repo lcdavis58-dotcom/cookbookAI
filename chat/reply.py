@@ -8,7 +8,7 @@ can be asked for.
 
 from actions import ask, match, scale
 
-PICK_HINT = "Say a number, part of the name, or the book."
+PICK_HINT = "Type a number, or part of the recipe's name or book."
 
 
 def _numbered(choices, more):
@@ -61,10 +61,12 @@ def match_reply(result):
     lines = [match.describe_typos(result.corrections)] if result.corrections else []
     lines.append(f"You have: {', '.join(result.have)}  (plus pantry staples)")
     lines += [f"  ({note})" for note in result.assumptions]
+    if result.only_partial:
+        lines.append(f"\n{match.ONLY_PARTIAL}")
     number = 0
     for heading, results in (("You can make", result.ready),
                              ("You can make, with a sub-recipe from scratch", result.from_scratch),
-                             ("Missing one thing", result.missing_one)):
+                             ("Missing some ingredients", result.missing_some)):
         lines.append(f"\n{heading} ({len(results)}):")
         if not results:
             lines.append("  (none)")
@@ -76,7 +78,8 @@ def match_reply(result):
         if len(results) > match.SHOW_PER_SECTION:
             lines.append(f"  ...and {len(results) - match.SHOW_PER_SECTION} more")
     if number:
-        lines.append('\nSay a number to see that recipe, or "add ..." / "without ..." to change the list.')
+        lines.append('\nTo see a recipe, type its number. To change your search, type "add" or "without" '
+                     'and an ingredient, like "add lemons."')
     return "\n".join(lines)
 
 

@@ -207,14 +207,14 @@ class MatchRenderTest(unittest.TestCase):
     def test_matches(self):
         result = match.MatchResult("matches", have=["lemon"], corrections=[Correction("lemmon", "lemon")],
                                    assumptions=["assuming x"], ready=[self.found("Curd")],
-                                   missing_one=[self.found("Tart", ["flour"])])
+                                   missing_some=[self.found("Tart", ["flour"])])
         self.assertEqual(match.render(result).splitlines(), [
             'Note: "lemmon" looks like a typo, so I searched for "lemon" instead.',
             "You have: lemon  (plus pantry staples)",
             "  (assuming x)",
             "", "You can make (1):", "  Curd  [Book A, p.3]", "      uses: lemon",
             "", "You can make, with a sub-recipe from scratch (0):", "  (none)",
-            "", "Missing one thing (1):", "  Tart  [Book A, p.3]", "      uses: lemon", "      missing: flour",
+            "", "Missing some ingredients (1):", "  Tart  [Book A, p.3]", "      uses: lemon", "      missing: flour",
         ])
 
     def test_long_sections_are_cut_short(self):

@@ -2,6 +2,7 @@
 Find recipes from the ingredients you have. See match.py.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from common import cli
@@ -12,6 +13,14 @@ from match_utils.typos import describe as describe_typos
 
 # How many recipes to list in each section before summarizing the rest.
 SHOW_PER_SECTION = 15
+# How many missing ingredients to name for one recipe.
+SHOW_MISSING = 5
+
+# More notes than this about one ingredient become a single line.
+MOST_ASSUMPTIONS_LISTED = 2
+ASSUMED_RE = re.compile(r"assuming your (.+?) is ")
+
+ONLY_PARTIAL = "Nothing uses all of those. These use some of them:"
 
 
 @dataclass
@@ -24,7 +33,7 @@ class MatchResult:
                           name was taken to mean, once each), and three
                           lists of find_matches() results: ready (makeable
                           now), from_scratch (makeable by making a
-                          sub-recipe from pantry staples), missing_one
+                          sub-recipe from pantry staples), missing_some
     staples is the pantry staples assumed on hand."""
     kind: str
     have: list = field(default_factory=list)
@@ -32,8 +41,25 @@ class MatchResult:
     assumptions: list = field(default_factory=list)
     ready: list = field(default_factory=list)
     from_scratch: list = field(default_factory=list)
-    missing_one: list = field(default_factory=list)
+    missing_some: list = field(default_factory=list)
     staples: set = field(default_factory=set)
+    only_partial: bool = False      # nothing used enough of what's listed, so these use some of it
+
+
+def _combined(notes):
+    """One line for an ingredient taken to mean several things: fourteen
+    kinds of "assuming your chocolate is ..." say the same thing."""
+    kinds = {}
+    for note in notes:
+        found = ASSUMED_RE.match(note)
+        kinds.setdefault(found.group(1) if found else note, []).append(note)
+    out = []
+    for item, group in kinds.items():
+        if len(group) > MOST_ASSUMPTIONS_LISTED:
+            out.append(f"assuming your {item} is the kind each recipe calls for")
+        else:
+            out += group
+    return out
 
 
 def run(text):
@@ -49,7 +75,7 @@ def run(text):
     staples = load_staples()
     have, corrections = TypoFixer(load_ingredient_words(entries=index), staples).fix(have)
 
-    results = find_matches(index, have)
+    results, only_partial = find_matches(index, have)
     # What a general name ("cream") was taken to mean, listed once rather
     # than under every recipe it applies to.
     assumptions = []
@@ -57,14 +83,15 @@ def run(text):
         for note in result["assumptions"]:
             if note not in assumptions:
                 assumptions.append(note)
+    assumptions = _combined(assumptions)
     ready = [r for r in results if not r["missing"]]
     return MatchResult(
-        "matches", have=have, corrections=corrections, assumptions=assumptions,
+        "matches", have=have, corrections=corrections, assumptions=assumptions, only_partial=only_partial,
         ready=[r for r in ready if not r["from_scratch"]],
         # Makeable, but only by making a sub-recipe (a pie dough) entirely
         # from pantry staples: real work the person didn't mention.
         from_scratch=[r for r in ready if r["from_scratch"]],
-        missing_one=[r for r in results if len(r["missing"]) == 1],
+        missing_some=[r for r in results if r["missing"]],
         staples=staples)
 
 
@@ -82,7 +109,9 @@ def describe(result):
         lines.append("      make first: " + ", ".join(
             f"{name} (from pantry staples)" if name in scratch else name for name in result["makes"]))
     if result["missing"]:
-        lines.append(f"      missing: {', '.join(result['missing'])}")
+        more = len(result["missing"]) - SHOW_MISSING
+        lines.append(f"      missing: {', '.join(result['missing'][:SHOW_MISSING])}"
+                     + (f" and {more} more" if more > 0 else ""))
     # Unlinked sub-recipes are counted in "missing" now; only the
     # placeholders that can't be matched are shown on their own.
     also = [f"{name} (your choice)" for name in entry.get("your_choice", [])]
@@ -117,7 +146,9 @@ def render(result):
     if cli.DEBUG:
         lines.append(f"[debug] staples: {', '.join(sorted(result.staples))}")
     lines += [f"  ({note})" for note in result.assumptions]
+    if result.only_partial:
+        lines.append(f"\n{ONLY_PARTIAL}")
     lines += section_lines("You can make", result.ready)
     lines += section_lines("You can make, with a sub-recipe from scratch", result.from_scratch)
-    lines += section_lines("Missing one thing", result.missing_one)
+    lines += section_lines("Missing some ingredients", result.missing_some)
     return "\n".join(lines)

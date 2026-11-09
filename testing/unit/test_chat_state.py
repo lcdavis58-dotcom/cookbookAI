@@ -88,7 +88,7 @@ class RememberTest(unittest.TestCase):
     def test_match(self):
         result = MatchResult("matches", have=["lemon", "pecan"],
                              ready=[matched(f"R{i}") for i in range(SHOW_PER_SECTION + 3)],
-                             from_scratch=[matched("S")], missing_one=[matched("M")])
+                             from_scratch=[matched("S")], missing_some=[matched("M")])
         remember(self.state, "match", "lemons, pecans", result)
         self.assertEqual(self.focus.have, ["lemon", "pecan"])
         titles = [r.title for r in self.focus.numbered.items]

@@ -1,6 +1,18 @@
 {
   "_comment": "Ingredients assumed to be on hand when matching recipes to what someone has: never listed as missing, never asked about. Names must match the normalized names in the recipe index (see match_utils/ingredient_names.py). Started from the ingredients in at least 20% of recipes across Dessert Person and The Book On Pie, then adjusted by hand: heavy cream left out (perishable), water, neutral oil and ground black pepper added (pantry basics one book rarely lists), and every salt kept, since each book names its own (Diamond Crystal kosher salt normalizes to kosher salt). Eggs cover egg yolk, egg white and egg wash through the matching rules, so those aren't listed. Revisit as more books are added.",
   "staples": [
+    "salt",
+    "pepper",
+    "black pepper",
+    "flour",
+    "butter",
+    "garlic",
+    "onion",
+    "baking powder",
+    "baking soda",
+    "cornstarch",
+    "light brown sugar",
+    "ground cinnamon",
     "granulated sugar",
     "unsalted butter",
     "all-purpose flour",

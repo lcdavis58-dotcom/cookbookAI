@@ -10,6 +10,7 @@
 
 <div class="quick" hx-target="#status" hx-swap="outerHTML show:window:bottom">
   {% if status.quick.numbers %}
+  <p class="quick-label">{{ "See a recipe" if status.quick.have else "Pick one" }}</p>
   <div class="quick-row">
     {% for n, recipe in status.quick.numbers %}
       {{ tap(url, n, n | string, name=recipe.title ~ ", " ~ recipe.book) }}
@@ -26,6 +27,7 @@
   {% endif %}
 
   {% if status.quick.have %}
+  <p class="quick-label">Your ingredients</p>
   <div class="quick-row">
     {% for item in status.quick.have %}
       {{ tap(url, item ~ " ✕", "without " ~ item, class="tag", name="Remove " ~ item) }}

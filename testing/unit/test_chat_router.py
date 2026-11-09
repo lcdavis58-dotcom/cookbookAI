@@ -227,10 +227,10 @@ class ReplyAndTurnTest(unittest.TestCase):
             return {"entry": {"title": title, "book": "B", "page": 0, "page_confirmed": False},
                     "uses": ["lemon"], "missing": [], "staples_used": [], "optional_on_hand": []}
         text = reply.match_reply(MatchResult("matches", have=["lemon"], ready=[found("A")],
-                                             missing_one=[dict(found("C"), missing=["x"])]))
+                                             missing_some=[dict(found("C"), missing=["x"])]))
         self.assertIn("  1. A  [B]", text)
         self.assertIn("  2. C  [B]", text)
-        self.assertIn("Say a number", text)
+        self.assertIn("type its number", text)
 
     def test_a_turn_is_saved_with_its_route_and_timings(self):
         directory = tempfile.mkdtemp()

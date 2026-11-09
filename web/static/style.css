@@ -187,6 +187,11 @@ small {
 }
 
 /* Buttons under the latest reply. */
+#status p.quick-label {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.875rem;
+}
+
 .quick-row {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,6 @@
 """
-Matching what someone has against the recipe index: which recipes they
-can make now, and which are missing just one thing.
+Matching what someone has against the recipe index: which recipes use
+enough of it, what each is missing, and the best ones first (find_matches).
 
 A recipe ingredient (one entry in the index, possibly an "X or Y" choice)
 counts as on hand when any of its options is:
@@ -39,6 +39,7 @@ that use none of the listed ingredients aren't returned at all, results
 center on what the person said they have.
 """
 
+import math
 import re
 
 from common.word_list_loader import load_universal
@@ -257,12 +258,28 @@ class Matcher:
         }
 
 
-def find_matches(index, have, max_missing=1):
-    """Every recipe that uses at least one listed ingredient and is missing
-    at most max_missing required ones, best first: fewest missing, then
-    most of the listed ingredients used, then fewest assumptions."""
+def enough_to_use(count):
+    """How many of someone's listed ingredients a recipe has to use: all
+    of one or two, then two-thirds, rounded up (8 listed, 6 used)."""
+    return count if count <= 2 else math.ceil(count * 2 / 3)
+
+
+def find_matches(index, have):
+    """(results, whether they're only partial), best first: most of the
+    listed ingredients used, then fewest missing, then fewest assumptions.
+
+    Listed pantry staples don't count, since nearly everything uses
+    them, unless staples are all that's listed. Results are the recipes
+    using enough_to_use() of the listed ingredients; when there are none,
+    the ones using any of them, marked as only partial."""
     matcher = Matcher(have, index=index)
-    results = [r for r in (matcher.check_recipe(e) for e in index)
-               if r and len(r["missing"]) <= max_missing]
-    return sorted(results, key=lambda r: (len(r["missing"]), -len(r["uses"]),
-                                          len(r["assumptions"]), r["entry"]["title"].lower()))
+    counted = [item for item in matcher.have if item not in matcher.staples] or matcher.have
+
+    def used(result):
+        return sum(1 for item in result["uses"] if item in counted)
+
+    found = [r for r in (matcher.check_recipe(e) for e in index) if r and used(r)]
+    enough = [r for r in found if used(r) >= enough_to_use(len(counted))]
+    return (sorted(enough or found, key=lambda r: (-used(r), len(r["missing"]), len(r["assumptions"]),
+                                                    r["entry"]["title"].lower())),
+            not enough and bool(found))
