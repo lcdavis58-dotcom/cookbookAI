@@ -1,0 +1,15 @@
+#!/bin/sh
+# Refuse a commit that includes a file .gitignore says to keep out (a
+# cookbook PDF, the database, website accounts, a key). `git add -f` gets
+# past .gitignore; this catches it before the commit exists. CI runs the
+# same check, since a hook can be skipped and isn't on every clone.
+#
+# Turn it on once per clone:  git config core.hooksPath .githooks
+
+files=$(git ls-files --cached --ignored --exclude-standard)
+if [ -n "$files" ]; then
+    echo "Commit refused: these files are in .gitignore but staged:"
+    echo "$files" | sed 's/^/  /'
+    echo "Unstage them with: git rm --cached <file>"
+    exit 1
+fi

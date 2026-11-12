@@ -114,6 +114,8 @@ Ingest runs in stages: extract (PDF to lines with layout, saved and reused until
 
 Run every script from `app/`.
 
+After cloning, run `git config core.hooksPath .githooks` once. Its pre-commit hook refuses a commit that includes anything `.gitignore` keeps out (a PDF, the database, website accounts, a key), even one added with `git add -f`. CI runs the same check.
+
 ### Models
 
 One chat model, `CHAT_MODEL` in `common/config.py` (`qwen2.5:7b`), does every model job: answering questions, reading scaling requests, and routing chat messages. Set the `CHAT_MODEL` environment variable to try another. It's slow on a Raspberry Pi's CPU; most common requests are handled by plain rules and never reach it.
