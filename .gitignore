@@ -23,6 +23,18 @@ venv/
 # ever ends up in this folder
 chroma_db/
 *.pdf
+chats/
+extracted/
+
+# Website accounts and the login-signing key, never commit
+users.json
+web_secret.key
+*.key
+*.pem
+.env
+
+# CI fails if any file matching a rule above is committed (see
+# .github/workflows/ci.yml); .githooks/pre-commit stops it locally first
 
 # OS / editor
 .DS_Store

@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A "Run workflow" button in the Actions tab. A manual run's secret scan
+  # covers the repo's whole history, not just the new commits.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -36,13 +39,41 @@ jobs:
       - name: Run the unit tests
         run: python -m unittest discover testing
 
+  repo-checks:
+    name: forbidden files and secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read   # gitleaks lists a pull request's commits
+    steps:
+      - name: Check out the code, with full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fail if a gitignored file is committed
+        run: |
+          files=$(git ls-files --cached --ignored --exclude-standard)
+          if [ -n "$files" ]; then
+            echo "::error::These files are in .gitignore but committed:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Scan for secrets with gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Branch protection requires a check named "test". Matrix jobs get names
   # like "unit tests (ubuntu-latest, Python 3.13)", so this one job reports
-  # for all of them.
+  # for all of them, and for the repo checks.
   test:
-    needs: unit-tests
+    needs: [unit-tests, repo-checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Check every unit test job passed
-        run: test "${{ needs.unit-tests.result }}" = success
+      - name: Check every job passed
+        run: |
+          test "${{ needs.unit-tests.result }}" = success
+          test "${{ needs.repo-checks.result }}" = success
