@@ -9,8 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  unit-tests:
+    name: unit tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux x64, Linux ARM64 (the Pi's CPU) and Windows x64 (the GPU machine).
+        # No Windows ARM: chromadb and pymupdf publish no Windows ARM wheels.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+        # 3.11 is Raspberry Pi OS Bookworm's Python; 3.13 is what runs locally.
+        python: ["3.11", "3.13"]
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
@@ -18,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
           cache: pip
 
       - name: Install dependencies
@@ -26,3 +35,14 @@ jobs:
 
       - name: Run the unit tests
         run: python -m unittest discover testing
+
+  # Branch protection requires a check named "test". Matrix jobs get names
+  # like "unit tests (ubuntu-latest, Python 3.13)", so this one job reports
+  # for all of them.
+  test:
+    needs: unit-tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every unit test job passed
+        run: test "${{ needs.unit-tests.result }}" = success
