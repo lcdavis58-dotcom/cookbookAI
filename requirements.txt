@@ -1,0 +1,10 @@
+# Ingest, search and the chat
+pymupdf==2.1
+chromadb==1.5.9
+ollama==0.6.3
+
+# The website
+Flask==3.1.3
+Flask-Login==0.6.3
+Flask-WTF==1.3.0
+waitress==3.0.2
