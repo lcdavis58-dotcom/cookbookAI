@@ -1,0 +1,2 @@
+# Tools for checking the code, not needed to run the app
+bandit==1.9.4

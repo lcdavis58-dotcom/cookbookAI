@@ -64,7 +64,7 @@ def snapshot(book_title):
             "page": entry["page"],
             "part_count": len(r["parts"]),
             "chars": len(text),
-            "text_hash": hashlib.sha1(text.encode("utf-8")).hexdigest()[:12],
+            "text_hash": hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()[:12],
             "ingredients": [i["name"] for i in entry["ingredients"]],
             "optional": [i["name"] for i in entry["optional"]],
             "sub_recipes": entry["sub_recipes"],

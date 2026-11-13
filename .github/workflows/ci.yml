@@ -65,15 +65,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  bandit:
+    name: bandit (Python security lint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install bandit
+        run: pip install -r requirements-dev.txt
+
+      # Tests are left out: they use assert, which bandit flags everywhere
+      - name: Scan the code
+        run: bandit -r . -x ./testing
+
   # Branch protection requires a check named "test". Matrix jobs get names
   # like "unit tests (ubuntu-latest, Python 3.13)", so this one job reports
-  # for all of them, and for the repo checks.
+  # for all of them, and for every other job listed in needs.
   test:
-    needs: [unit-tests, repo-checks]
+    needs: [unit-tests, repo-checks, bandit]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check every job passed
         run: |
-          test "${{ needs.unit-tests.result }}" = success
-          test "${{ needs.repo-checks.result }}" = success
+          echo '${{ toJSON(needs) }}'
+          test "${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}" = true
