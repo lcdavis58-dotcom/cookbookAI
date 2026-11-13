@@ -1,0 +1,40 @@
+name: Release
+
+# Runs when a version tag is pushed: git tag v1.0.1 && git push origin v1.0.1
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release
+    steps:
+      - name: Check out the tagged commit, with all branches and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Only release what reached main through a pull request and CI
+      - name: Check the tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that isn't on main"
+            exit 1
+          fi
+
+      - name: Check the version written matches the tag
+        run: python3 tools/check_version.py "$GITHUB_REF_NAME"
+
+      # gh is GitHub's command-line tool, already on the runner.
+      # --generate-notes lists the pull requests merged since the last tag.
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "CookbookAI ${GITHUB_REF_NAME#v}"

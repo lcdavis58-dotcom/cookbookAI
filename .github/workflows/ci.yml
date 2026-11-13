@@ -80,6 +80,10 @@ jobs:
             exit 1
           fi
 
+      # Every place the version is written must agree (tools/check_version.py)
+      - name: Check the version number agrees everywhere
+        run: python3 tools/check_version.py
+
       - name: Scan for secrets with gitleaks
         uses: gitleaks/gitleaks-action@v3
         env:
