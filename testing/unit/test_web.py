@@ -670,23 +670,23 @@ class ThrottleTest(unittest.TestCase):
         self.now = 1000
         self.throttle = Throttle(clock=lambda: self.now)
 
-    def fail(self, times=FAILURE_LIMIT, name="levi"):
+    def fail_login(self, times=FAILURE_LIMIT, name="levi"):
         for _ in range(times):
             self.throttle.failed(name)
 
     def test_waits_only_after_the_limit(self):
-        self.fail(FAILURE_LIMIT - 1)
+        self.fail_login(FAILURE_LIMIT - 1)
         self.assertFalse(self.throttle.blocked("levi"))
-        self.fail(1)
+        self.fail_login(1)
         self.assertTrue(self.throttle.blocked("levi"))
 
     def test_the_wait_ends(self):
-        self.fail()
+        self.fail_login()
         self.now += WAIT_SECONDS + 1
         self.assertFalse(self.throttle.blocked("levi"))
 
     def test_one_name_does_not_affect_another(self):
-        self.fail()
+        self.fail_login()
         self.assertFalse(self.throttle.blocked("tester"))
 
 
