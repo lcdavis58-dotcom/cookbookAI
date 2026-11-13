@@ -30,6 +30,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not accounts.load():
         print("No accounts yet, so nobody can sign in. Make one with: python3 tools/add_user.py NAME")
-    host = "0.0.0.0" if args.lan else "127.0.0.1"
+    # All interfaces only when asked for with --lan
+    host = "0.0.0.0" if args.lan else "127.0.0.1"  # nosec B104
     print(f"Listening on {host}:{args.port} (Ctrl+C to stop)")
     serve(create_app(https=args.https), host=host, port=args.port)
