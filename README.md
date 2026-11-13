@@ -156,6 +156,7 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 - **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
 - **CI with GitHub Actions** (no set version): run the unit tests on every push and pull request
+- **Tests for the command-line wrappers** (no set version): `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` have no tests yet, then raise CI's coverage floor
 
 ## Note
 
