@@ -1,0 +1,15 @@
+# ruff, the linter: python -m ruff check .
+# CI fails on anything it finds.
+
+# The oldest Python CI tests on
+target-version = "py311"
+
+[lint]
+select = [
+    "E4", "E7", "E9",  # pycodestyle's error-level checks (not its formatting ones)
+    "F",               # pyflakes: unused imports and variables, undefined names
+    "B",               # flake8-bugbear: patterns that are usually bugs
+]
+ignore = [
+    "B905",  # zip() without strict=: the lists zipped here are built the same length
+]

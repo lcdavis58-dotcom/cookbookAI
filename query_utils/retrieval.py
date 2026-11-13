@@ -72,7 +72,7 @@ def retrieve(question, top_k=TITLE_SEARCH_K):
         print(f"--- Retrieval debug (all candidates before filtering, {retrieval_time:.2f}s) ---")
         for h in all_hits:
             # Flatten newlines so each candidate stays on one line.
-            preview = " / ".join(l.strip() for l in h["text"][:80].splitlines() if l.strip())
+            preview = " / ".join(ln.strip() for ln in h["text"][:80].splitlines() if ln.strip())
             kept = "" if h["distance"] <= MAX_DISTANCE else "  [over MAX_DISTANCE, title matching only]"
             part = f" part {h['part'] + 1}/{h['part_count']}" if h["part_count"] > 1 else ""
             print(f"  distance={h['distance']:.4f}  {h['book']} p.{h['page']} "

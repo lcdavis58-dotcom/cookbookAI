@@ -30,7 +30,7 @@ def style(line):
 def dump_blocks(pdf_path, needle):
     found = 0
     for page in load_extraction(pdf_path):
-        if needle.lower() not in "\n".join(l["text"] for l in page["lines"]).lower():
+        if needle.lower() not in "\n".join(ln["text"] for ln in page["lines"]).lower():
             continue
         found += 1
         print(f"===== PDF page {page['index']} (printed {page['printed']}, "

@@ -66,7 +66,7 @@ def join_title_lines(segment_lines, first_index, title_indices):
     if n < 2:
         return segment_lines
     title = ""
-    for line in (l.strip() for l in segment_lines[:n]):
+    for line in (ln.strip() for ln in segment_lines[:n]):
         if not line:
             continue
         title = f"{title}{line}" if title.endswith(("-", "–")) or not title else f"{title} {line}"

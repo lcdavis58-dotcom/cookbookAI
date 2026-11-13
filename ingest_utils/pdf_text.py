@@ -10,7 +10,7 @@ from ingest_utils.extract import load_extraction
 def extract_pages(pdf_path):
     """Yield (page_number_or_None, confirmed, text) for every non-empty page."""
     for page in load_extraction(pdf_path):
-        yield page["printed"], page["confirmed"], "\n".join(l["text"] for l in page["lines"])
+        yield page["printed"], page["confirmed"], "\n".join(ln["text"] for ln in page["lines"])
 
 
 def build_layout_stream(pdf_path):

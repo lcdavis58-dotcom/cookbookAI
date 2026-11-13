@@ -60,7 +60,7 @@ def extract_yield_line(text):
     for i, line in enumerate(lines):
         if line.strip().upper().startswith(("MAKES", "SERVES", "YIELD:")):
             block = lines[i:i + 3]
-            return " ".join(l.strip() for l in block if l.strip())
+            return " ".join(ln.strip() for ln in block if ln.strip())
     return ""
 
 

@@ -127,7 +127,7 @@ def late_labels(recipe):
             steps_started = True
         elif (steps_started and ALLCAPS_LINE_RE.match(stripped)
               and is_component_label(lines, i, profile.parse_ingredient_line)):
-            following = next((l.strip() for l in lines[i + 1:] if l.strip()), "")
+            following = next((ln.strip() for ln in lines[i + 1:] if ln.strip()), "")
             found.append((stripped, following))
     return found
 

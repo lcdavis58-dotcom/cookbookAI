@@ -192,7 +192,7 @@ def extract_book(pdf_path):
         lines = extract_page_lines(page)
         if not lines:
             continue
-        printed, confirmed = guess_printed_page_number([l["text"] for l in lines])
+        printed, confirmed = guess_printed_page_number([ln["text"] for ln in lines])
         pages.append({"index": page_index, "printed": printed, "confirmed": confirmed,
                       "width": round(page.rect.width, 1), "height": round(page.rect.height, 1),
                       "lines": lines})
