@@ -725,6 +725,12 @@ class AccountsTest(unittest.TestCase):
         self.assertFalse(accounts.remove("levi", self.path))
         self.assertEqual(accounts.load(self.path), {})
 
+    def test_names(self):
+        self.assertEqual(accounts.names(self.path), [])
+        accounts.set_password("tester", PASSWORD, self.path)
+        accounts.set_password("Levi", PASSWORD, self.path)
+        self.assertEqual(accounts.names(self.path), ["levi", "tester"])
+
 
 if __name__ == "__main__":
     unittest.main()

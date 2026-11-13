@@ -41,7 +41,10 @@ _OPTIONAL_RE = re.compile(r"\boptional\b|\bfor (?:serving|sprinkling|dusting|gar
 
 # A list at the start of a name that ends in "or"/"and": "gruyère,
 # manchego, or parmesan", "honey, olive oil, and a lemon wedge".
-_COMMA_LIST_RE = re.compile(r"^([^,]+(?:,\s*[^,]+?)+),\s*(or|and/or|and)\s+([^,]+)")
+# Each item runs comma to comma, so there's only one way to split a line
+# into items: "\s*" before a lazy item gave many ways, and a long line of
+# commas and spaces that didn't match took seconds to minutes to fail.
+_COMMA_LIST_RE = re.compile(r"^([^,]+(?:,[^,]+)+),\s*(or|and/or|and)\s+([^,]+)")
 # A prep note among those commas ("vanilla bean, halved lengthwise,
 # seeds scraped out, or 2 teaspoons vanilla extract") means they aren't
 # a list of ingredients.
