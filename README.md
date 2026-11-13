@@ -149,6 +149,17 @@ Most books need only settings. Run `tools/diagnostics/book_report.py "<title>" -
 
 Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS` in `ingest.py` (and to `BOOK_FILES` in `common/config.py` if it isn't there). Re-run `book_report.py` to check its recipes, groups and rejected lines, and `tools/diagnostics/structure_baseline.py compare` to check that a change didn't break the books already working.
 
+## Releasing
+
+1. In a pull request, change the `Version` line at the top of this README (and anywhere else listed in `PLACES` in `tools/check_version.py`). CI fails if the places disagree.
+2. Once it's merged, tag the merge on `main` and push the tag:
+   ```
+   git switch main && git pull
+   git tag v1.0.1
+   git push origin v1.0.1
+   ```
+3. The Release workflow checks that the tag is on `main` and matches the version written, then publishes a GitHub release listing the pull requests merged since the last one.
+
 ## Roadmap
 
 - **1.0.1:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
