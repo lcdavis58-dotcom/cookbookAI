@@ -46,7 +46,6 @@ lookup() returns one of:
 """
 
 import re
-import string
 import unicodedata
 from dataclasses import dataclass, field
 

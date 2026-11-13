@@ -85,8 +85,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  bandit:
-    name: bandit (Python security lint)
+  lint:
+    name: lint (ruff and bandit)
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
@@ -99,18 +99,25 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
-      - name: Install bandit
+      - name: Install ruff and bandit
         run: pip install -r requirements-dev.txt
 
-      # Tests are left out: they use assert, which bandit flags everywhere
-      - name: Scan the code
+      # Settings in ruff.toml. The github format turns each finding into a
+      # note on that line of the pull request's diff.
+      - name: ruff
+        run: ruff check . --output-format=github
+
+      # Tests are left out: they use assert, which bandit flags everywhere.
+      # if: always() runs it even when ruff found something, to see both.
+      - name: bandit
+        if: always()
         run: bandit -r . -x ./testing
 
   # Branch protection requires a check named "test". Matrix jobs get names
   # like "unit tests (ubuntu-latest, Python 3.13)", so this one job reports
   # for all of them, and for every other job listed in needs.
   test:
-    needs: [unit-tests, repo-checks, bandit]
+    needs: [unit-tests, repo-checks, lint]
     if: always()
     runs-on: ubuntu-latest
     steps:

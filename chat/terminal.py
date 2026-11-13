@@ -215,4 +215,5 @@ class Terminal:
                     return
                 continue
             state = self.state
-            self.answer(lambda: turn.handle(state, line, self.directory, self.candidates))
+            # answer() calls it right away, so it sees this pass's state and line
+            self.answer(lambda: turn.handle(state, line, self.directory, self.candidates))  # noqa: B023

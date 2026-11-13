@@ -60,9 +60,10 @@ def analyze(recipes):
         # Lines the parser rejected inside an ingredient block: dropped
         # silently by scaling, but exactly what this report needs to show
         # (like "Butter for the pan", which has no amount).
+        # Only called during this pass, so book and title are this recipe's
         def trace(kind, line):
             if kind == "rejected":
-                unparsed.append((book, title, line))
+                unparsed.append((book, title, line))  # noqa: B023
         groups = extract_ingredient_groups(text, strategy, trace=trace)
 
         names = set()

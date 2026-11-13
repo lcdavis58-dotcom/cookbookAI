@@ -41,11 +41,11 @@ def summarize(book_title, pdf_path):
     # Any line mentioning "season" at all, however it's formatted. If the
     # detector found nothing but these exist, their exact repr shows why
     # (casing, a stray leading character, "Season" split from its colon).
-    season_lines = [(i, l) for i, l in enumerate(lines) if "season" in l.lower()]
+    season_lines = [(i, ln) for i, ln in enumerate(lines) if "season" in ln.lower()]
     print(f"\nLines containing 'season' (any case): {len(season_lines)}")
-    for i, l in season_lines[:10]:
+    for i, ln in season_lines[:10]:
         prev = lines[i - 1] if i > 0 else ""
-        print(f"  line {i}: {l!r}")
+        print(f"  line {i}: {ln!r}")
         print(f"      previous line: {prev!r}")
 
 

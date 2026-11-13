@@ -1,5 +1,7 @@
 # CookbookAI
 
+[![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
+
 Version 1.0.0
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
@@ -156,7 +158,7 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 - **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
 - **CI with GitHub Actions** (no set version): run the unit tests on every push and pull request
-- **Tests for the command-line wrappers** (no set version): `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` have no tests yet, then raise CI's coverage floor
+- **More unit tests** (no set version), then raise CI's coverage floor: first `scale_utils/pan_scaling.py`, `books/line_styles.py` and `match_utils/recipe_index.py` (each about a quarter covered), then the command-line wrappers `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` (none yet)
 
 ## Note
 
