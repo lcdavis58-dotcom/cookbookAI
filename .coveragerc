@@ -1,0 +1,14 @@
+# Settings for coverage.py (python -m coverage run / report)
+
+[run]
+source = .
+omit =
+    # The tests themselves
+    testing/*
+    # Maintenance and diagnostic scripts, run by hand, not part of the app
+    tools/*
+
+[report]
+show_missing = true
+skip_empty = true
+sort = cover
