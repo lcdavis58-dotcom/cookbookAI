@@ -23,15 +23,19 @@ if __name__ == "__main__":
     parser.add_argument("--remove", metavar="NAME", help="delete an account (its chats are kept)")
     args = parser.parse_args()
     if args.list:
-        print("\n".join(sorted(accounts.load())) or "No accounts yet.")
+        print("\n".join(accounts.names()) or "No accounts yet.")
     elif args.remove:
         print("Removed." if accounts.remove(args.remove) else "No account by that name.")
     elif args.name:
         password = getpass.getpass("Password: ")
         if password != getpass.getpass("Same password again: "):
             sys.exit("Those didn't match. Nothing was changed.")
+        # The name printed comes from the name typed, not from anything
+        # the password passed through
+        name = accounts.normalize(args.name)
         try:
-            print(f"Saved the account {accounts.set_password(args.name, password)!r}.")
+            accounts.set_password(name, password)
+            print(f"Saved the account {name!r}.")
         except accounts.AccountError as e:
             sys.exit(str(e))
     else:

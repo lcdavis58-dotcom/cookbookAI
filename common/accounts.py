@@ -37,8 +37,9 @@ def valid_name(name):
     return re.fullmatch(NAME_PATTERN, name) is not None
 
 
-def load(path=USERS_PATH):
-    """{user name: password hash}; empty if there are no accounts yet."""
+def _read_users(path):
+    """{user name: its saved record} for the valid names; empty if there
+    are no accounts yet."""
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -46,7 +47,18 @@ def load(path=USERS_PATH):
         return {}
     if data.get("format") != FORMAT:
         raise AccountError(f"{path} is in format {data.get('format')!r}, this version reads format {FORMAT}")
-    return {name: user["password"] for name, user in data["users"].items() if valid_name(name)}
+    return {name: user for name, user in data["users"].items() if valid_name(name)}
+
+
+def load(path=USERS_PATH):
+    """{user name: password hash}; empty if there are no accounts yet."""
+    return {name: user["password"] for name, user in _read_users(path).items()}
+
+
+def names(path=USERS_PATH):
+    """The account names, sorted, without touching any password hash, so
+    they're safe to print."""
+    return sorted(_read_users(path))
 
 
 def _save(users, path):
