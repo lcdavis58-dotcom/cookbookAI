@@ -32,12 +32,32 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run the unit tests
-        run: python -m unittest discover testing
+      - name: Run the unit tests, measuring coverage
+        run: python -m coverage run -m unittest discover testing
+
+      # One job is enough for the summary table and the HTML report
+      - name: Write coverage to the job summary
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        run: |
+          echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage html
+
+      - name: Save the HTML coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: htmlcov/
+
+      # Fails if coverage drops below the floor; raise it as tests are added
+      - name: Check coverage hasn't dropped
+        run: python -m coverage report --fail-under=65
 
   repo-checks:
     name: forbidden files and secrets
