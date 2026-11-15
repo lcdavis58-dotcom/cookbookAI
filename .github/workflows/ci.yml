@@ -38,7 +38,7 @@ jobs:
         run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run the unit tests, measuring coverage
-        run: python -m coverage run -m unittest discover testing
+        run: python -m coverage run -m unittest discover -s testing/unit -t .
 
       # One job is enough for the summary table and the HTML report
       - name: Write coverage to the job summary
@@ -57,7 +57,7 @@ jobs:
 
       # Fails if coverage drops below the floor; raise it as tests are added
       - name: Check coverage hasn't dropped
-        run: python -m coverage report --fail-under=65
+        run: python -m coverage report --fail-under=74
 
   repo-checks:
     name: forbidden files and secrets

@@ -4,7 +4,7 @@ wording (chat/reply.py) and a whole turn (chat/turn.py). Recipes are a
 handful of made-up index candidates; the model is patched out.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import shutil

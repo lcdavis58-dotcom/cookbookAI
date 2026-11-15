@@ -3,7 +3,7 @@ Tests for the website (web/), using Flask's test client on temporary
 folders. Nothing here needs the database or a model.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import html

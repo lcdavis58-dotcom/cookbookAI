@@ -4,7 +4,7 @@ input. Messages are ones the routing rules answer, so no model is
 needed; where a model call would happen, it's patched to fail or stop.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import shutil

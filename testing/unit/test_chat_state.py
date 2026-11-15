@@ -4,7 +4,7 @@ Tests for what a chat remembers (chat/state.py) and saving it
 or a model.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import json
