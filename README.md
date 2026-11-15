@@ -162,13 +162,13 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.0.1:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
-- **1.0.2:** stop reading some sentences as ingredient lists or scaling requests
+- **1.0.1:** more unit tests, then raise CI's coverage floor: first `scale_utils/pan_scaling.py`, `books/line_styles.py` and `match_utils/recipe_index.py` (each about a quarter covered), then the command-line wrappers `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` (none yet)
+- **1.0.2:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
+- **1.0.3:** stop reading some sentences as ingredient lists or scaling requests
 - **1.1.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together
 - **1.2.0:** show chat replies word by word, lay recipes out more readably on the website
 - **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
 - Move from the Raspberry Pi to a GPU machine
-- **More unit tests** (no set version), then raise CI's coverage floor: first `scale_utils/pan_scaling.py`, `books/line_styles.py` and `match_utils/recipe_index.py` (each about a quarter covered), then the command-line wrappers `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` (none yet)
 
 ## Note
 
