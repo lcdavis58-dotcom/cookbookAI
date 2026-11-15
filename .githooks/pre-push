@@ -11,6 +11,19 @@
 # too. Skip it once with: git push --no-verify (CI still checks).
 # Turn it on once per clone:  git config core.hooksPath .githooks
 
+# Git lists what's being pushed on stdin, one "local-ref local-sha
+# remote-ref remote-sha" line each; a deleted branch or tag has a local
+# sha of all zeros. A push that only deletes has nothing to test.
+only_deletes=yes
+while read -r _ local_sha _ _; do
+    case "$local_sha" in
+        *[!0]*) only_deletes=no ;;
+    esac
+done
+if [ "$only_deletes" = yes ]; then
+    exit 0
+fi
+
 # The venv in COOKBOOK_DATA_DIR if there is one, else python3.
 PY=python3
 for candidate in "$COOKBOOK_DATA_DIR/venv/Scripts/python.exe" "$COOKBOOK_DATA_DIR/venv/bin/python"; do
