@@ -2,7 +2,7 @@
 Tests for ingredient name normalization (match_utils/ingredient_names.py).
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import time

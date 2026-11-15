@@ -3,7 +3,7 @@ Tests for ingredient typo correction (match_utils/typos.py) and the word
 counts saved with the recipe index.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import unittest

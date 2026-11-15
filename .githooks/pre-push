@@ -1,0 +1,56 @@
+#!/bin/sh
+# Before a push, run what CI will: the unit tests with the coverage
+# floor, ruff and bandit, so a failure shows here in seconds rather than
+# on GitHub minutes later. Then the local tests that need no model (the
+# PDFs and the recipe index), which skip themselves on a machine without
+# them. The model tests (testing/local/test_model.py) are left out: they
+# take minutes and the model can be wrong by chance. Run them by hand
+# before a release.
+#
+# It tests the files in this folder, so uncommitted changes are tested
+# too. Skip it once with: git push --no-verify (CI still checks).
+# Turn it on once per clone:  git config core.hooksPath .githooks
+
+# The venv in COOKBOOK_DATA_DIR if there is one, else python3.
+PY=python3
+for candidate in "$COOKBOOK_DATA_DIR/venv/Scripts/python.exe" "$COOKBOOK_DATA_DIR/venv/bin/python"; do
+    if [ -n "$COOKBOOK_DATA_DIR" ] && [ -x "$candidate" ]; then
+        PY="$candidate"
+        break
+    fi
+done
+
+# The same floor CI uses, read from ci.yml so the two can't drift apart.
+FLOOR=$(sed -n 's/.*--fail-under=\([0-9][0-9]*\).*/\1/p' .github/workflows/ci.yml | head -n 1)
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "pre-push: note, there are uncommitted changes; they're tested but not pushed."
+fi
+
+fail() {
+    echo "pre-push: $1 failed, push stopped. (git push --no-verify skips this check.)"
+    exit 1
+}
+
+# Unit tests as CI runs them: no model, no data, no PDFs, so a test that
+# quietly depends on this PC's files fails here, not just on GitHub.
+EMPTY=$(mktemp -d)
+trap 'rm -rf "$EMPTY"' EXIT
+# Windows Python needs the folder as C:/..., which Git Bash's pwd -W gives.
+EMPTY_FOR_PY=$(cd "$EMPTY" && (pwd -W 2>/dev/null || pwd))
+echo "pre-push: unit tests and coverage (floor ${FLOOR}%)"
+COOKBOOK_DATA_DIR="$EMPTY_FOR_PY" COOKBOOKS_DIR="$EMPTY_FOR_PY" OLLAMA_HOST=127.0.0.1:9 \
+    "$PY" -m coverage run -m unittest discover -q -s testing/unit -t . || fail "unit tests"
+REPORT=$("$PY" -m coverage report --fail-under="$FLOOR")
+STATUS=$?
+echo "$REPORT" | grep '^TOTAL'
+[ "$STATUS" -eq 0 ] || fail "coverage floor"
+
+echo "pre-push: ruff and bandit"
+"$PY" -m ruff check . || fail "ruff"
+"$PY" -m bandit -q -r . -x ./testing || fail "bandit"
+
+echo "pre-push: local tests (PDFs and recipe index)"
+"$PY" -m unittest -q testing.local.test_pdfs testing.local.test_index || fail "local tests"
+
+echo "pre-push: all passed"

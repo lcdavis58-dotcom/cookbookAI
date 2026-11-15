@@ -2,7 +2,7 @@
 Tests for the version check (tools/check_version.py).
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import unittest

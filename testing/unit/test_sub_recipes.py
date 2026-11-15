@@ -3,7 +3,7 @@ Tests for sub-recipe linking (match_utils/sub_recipes.py) and matching
 through sub-recipes (match_utils/matching.py), on an invented book.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import copy

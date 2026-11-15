@@ -3,7 +3,7 @@ Tests for the website (web/), using Flask's test client on temporary
 folders. Nothing here needs the database or a model.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import html
@@ -367,8 +367,11 @@ class SendingTest(WebCase):
             with self.subTest(text):
                 self.failure = error
                 chat = self.saved_chat(reply=None, chat_id=f"2026-11-01-0900-{len(text) % 10}abc")
-                self.client.post(f"/chats/{chat.id}/answer")
-                self.answers.join()
+                # The failure is logged with its traceback, for the server's log.
+                with self.assertLogs("web.answers", "ERROR") as logged:
+                    self.client.post(f"/chats/{chat.id}/answer")
+                    self.answers.join()
+                self.assertIn(f"Couldn't answer chat {chat.id}", logged.output[0])
                 body = self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True)
                 self.assertIn(text, html.unescape(body))
                 self.assertIn("Answer it now", body)
@@ -378,8 +381,9 @@ class SendingTest(WebCase):
     def test_retry_clears_the_failure(self):
         chat = self.saved_chat(reply=None)
         self.failure = ConnectionError("down")
-        self.client.post(f"/chats/{chat.id}/answer")
-        self.answers.join()
+        with self.assertLogs("web.answers", "ERROR"):
+            self.client.post(f"/chats/{chat.id}/answer")
+            self.answers.join()
         self.failure = None
         self.client.post(f"/chats/{chat.id}/answer")
         self.answers.join()

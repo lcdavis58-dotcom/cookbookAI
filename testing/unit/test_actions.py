@@ -5,7 +5,7 @@ been found. Recipes here are made up, not book text, and nothing needs
 the database or a model.
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import sys

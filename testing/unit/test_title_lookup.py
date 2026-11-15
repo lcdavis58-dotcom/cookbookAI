@@ -3,7 +3,7 @@ Tests for query_utils/title_lookup.py, against a small invented recipe
 index (made-up titles, never ones copied from the books).
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
     python3 -m pytest testing          (if pytest is installed)
 """
 

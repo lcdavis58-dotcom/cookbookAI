@@ -5,7 +5,7 @@ and how what a person types finds titles (query_utils/title_lookup.py,
 actions/ask.py, the listing rule in chat/router.py).
 
 Run from app/:
-    python3 -m unittest discover testing
+    python3 -m unittest discover -s testing/unit -t .
 """
 
 import unittest

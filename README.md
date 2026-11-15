@@ -141,7 +141,7 @@ Every chat reply saves how long each model call took, and `tools/diagnostics/mod
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
 | `tools/` | Maintenance scripts; `tools/diagnostics/` for seeing how ingest and the parsers read a book |
-| `testing/` | Unit tests (`python3 -m unittest discover testing`) and a local-only scratch folder (see `testing/README.md`) |
+| `testing/` | Unit tests (`python3 -m unittest discover -s testing/unit -t .`), local tests that need the PDFs, database and model (`testing/local/`), and a local-only scratch folder (see `testing/README.md`) |
 
 ## Adding a book
 
@@ -162,14 +162,15 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.0.1:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
-- **1.0.2:** stop reading some sentences as ingredient lists or scaling requests
-- **1.1.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together
-- **1.2.0:** show chat replies word by word, lay recipes out more readably on the website
-- **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
+- **1.0.1:** more unit tests and a higher coverage floor in CI (`scale_utils/pan_scaling.py`, `books/line_styles.py`, `match_utils/recipe_index.py`, the command-line scripts), local tests that need the PDFs, database and model (`testing/local/`), and a pre-push hook
+- **1.1.0:** flag a reply as wrong on the website, with an optional note on what was wrong, and list every flagged reply for planning fixes and tests
+- **1.1.1:** clean up oddly read ingredient names (like "flour for rolling" counted as missing), link the remaining sub-recipes, ingredient parser fixes
+- **1.1.2:** understand what's asked for: stop reading some sentences as ingredient lists ("..., show me the one from dessert person") or "half and half" as halving, scale to a number of people from the servings you say the recipe makes ("it usually feeds 5"), scale by a count you have ("I only have 1 egg") when the recipe also gives that ingredient's weight, read "half again as much" and "scale that by 3", stop scaling a pie crust or a pinch of salt to "~1.12 whole", and word scaling refusals plainly
+- **1.1.3:** find the right recipe: "butter cream" finds Buttercream, say when a recipe was found through its variation, show a recipe named in part ("the extra-thick one"), answer a question that names a recipe instead of showing it, see results past the first 15, and better ordering when results tie
+- **1.2.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together (including listing every recipe of a dish, not just the closest titles)
+- **1.3.0:** show chat replies word by word, lay recipes out more readably on the website
+- **1.4.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab), and answer general cooking questions ("what's the difference between baking soda and baking powder?")
 - Move from the Raspberry Pi to a GPU machine
-- **CI with GitHub Actions** (no set version): run the unit tests on every push and pull request
-- **More unit tests** (no set version), then raise CI's coverage floor: first `scale_utils/pan_scaling.py`, `books/line_styles.py` and `match_utils/recipe_index.py` (each about a quarter covered), then the command-line wrappers `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` (none yet)
 
 ## Note
 
