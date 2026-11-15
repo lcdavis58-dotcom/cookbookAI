@@ -141,7 +141,7 @@ Every chat reply saves how long each model call took, and `tools/diagnostics/mod
 | `common/` | Shared config, embeddings, CLI helpers |
 | `word_lists/`, `ingredient_rules/` | Data files for detection and scaling rules |
 | `tools/` | Maintenance scripts; `tools/diagnostics/` for seeing how ingest and the parsers read a book |
-| `testing/` | Unit tests (`python3 -m unittest discover -s testing/unit -t .`) and a local-only scratch folder (see `testing/README.md`) |
+| `testing/` | Unit tests (`python3 -m unittest discover -s testing/unit -t .`), local tests that need the PDFs, database and model (`testing/local/`), and a local-only scratch folder (see `testing/README.md`) |
 
 ## Adding a book
 
@@ -164,10 +164,10 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 - **1.0.1:** more unit tests, then raise CI's coverage floor: first `scale_utils/pan_scaling.py`, `books/line_styles.py` and `match_utils/recipe_index.py` (each about a quarter covered), then the command-line wrappers `chat.py`, `serve.py`, `query.py`, `scale.py` and `match.py` (none yet)
 - **1.0.2:** clean up oddly read ingredient names, link the remaining sub-recipes, ingredient parser fixes
-- **1.0.3:** stop reading some sentences as ingredient lists or scaling requests, and scale to a number of people from the servings you say the recipe makes ("it usually feeds 5")
+- **1.0.3:** stop reading some sentences as ingredient lists or scaling requests, scale to a number of people from the servings you say the recipe makes ("it usually feeds 5"), and scale by a count you have ("I only have 1 egg") when the recipe also gives that ingredient's weight
 - **1.1.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together
 - **1.2.0:** show chat replies word by word, lay recipes out more readably on the website
-- **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab)
+- **1.3.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab), and answer general cooking questions ("what's the difference between baking soda and baking powder?")
 - Move from the Raspberry Pi to a GPU machine
 
 ## Note
