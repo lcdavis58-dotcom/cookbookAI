@@ -59,7 +59,7 @@ class ScaleIntentTest(unittest.TestCase):
     def test_yield_she_states(self):
         self.check("this usually feeds 5 people, make it feed 8", 1.6)
 
-    @unittest.skip("known gap, planned for 1.0.3: the model uses the yield line's 8, not her 4")
+    @unittest.skip("known gap, planned for 1.1.2: the model uses the yield line's 8, not her 4")
     def test_yield_she_states_known_gap(self):
         self.check("it normally serves 4, i want 10", 2.5)
 
@@ -102,7 +102,7 @@ class RoutingTest(unittest.TestCase):
     def test_question(self):
         self.check("how long does whipped cream keep in the fridge", "ask")
 
-    @unittest.skip("known gap, planned for 1.3.0: the model asks her what she means instead of answering")
+    @unittest.skip("known gap, planned for 1.4.0: the model asks her what she means instead of answering")
     def test_general_question_known_gap(self):
         self.check("what's the difference between baking soda and baking powder?", "ask")
 
@@ -123,7 +123,7 @@ class AnswerTest(unittest.TestCase):
         self.assertTrue(result.sources)
 
     @needs_model
-    @unittest.skip("known gap, not planned yet: a question naming a recipe shows recipes instead of answering")
+    @unittest.skip("known gap, planned for 1.1.3: a question naming a recipe shows recipes instead of answering")
     def test_question_naming_a_recipe_known_gap(self):
         result = ask.run("how long does whipped cream keep in the fridge")
         self.assertEqual(result.kind, "answer")
@@ -134,7 +134,7 @@ class AnswerTest(unittest.TestCase):
 class RealChatTest(unittest.TestCase):
     """Replays of real chats, through routing, the actions and the model."""
 
-    @unittest.skip("known gap, planned for 1.0.3: chat 2026-11-12-2131-sz7k got 1.000x and 1.125x")
+    @unittest.skip("known gap, planned for 1.1.2: chat 2026-11-12-2131-sz7k got 1.000x and 1.125x")
     def test_pumpkin_pie_for_more_people_known_gap(self):
         state = ChatState.new()
         turn.respond(state, "show me a pumpkin pie recipe")
