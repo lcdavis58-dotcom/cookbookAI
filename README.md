@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.0.0
+Version 1.0.1
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
