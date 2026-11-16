@@ -3,15 +3,11 @@
   "ingredients": [
     {
       "keyword": "egg",
-      "note": "Eggs don't divide cleanly. If the scaled amount isn't a whole number, round to the nearest whole egg, or whisk one egg and measure out a partial amount by volume (about 3 tablespoons per large egg) if precision matters."
+      "note": "Eggs don't divide cleanly, so the count is rounded to whole eggs. For an exact amount, whisk one egg and measure part of it: a large egg is about 3 tablespoons, a yolk about 1, a white about 2."
     },
     {
       "keyword": "graham cracker",
       "note": "Whole crackers/sheets don't split cleanly. Round to the nearest whole cracker, extra crumbs from a slightly-over amount are rarely a problem."
-    },
-    {
-      "keyword": "pie crust",
-      "note": "A pie crust isn't a divisible quantity. Scaling likely means you need a different pan size or an extra crust, not a fractional one."
     },
     {
       "keyword": "sheet of gelatin",

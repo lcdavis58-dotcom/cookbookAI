@@ -289,3 +289,81 @@ def pick_default_batch(groups):
         if name.lower() in ("full batch", "regular batch"):
             return name
     return None
+
+
+# "3 large eggs plus 1 large egg yolk", "zest and 2 teaspoons juice":
+# a second ingredient, with its own amount, after the first one's name.
+_SECOND_AMOUNT_RE = re.compile(r",?\s+(plus|and)\s+(?=[\d½¼¾⅓⅔⅛])")
+# A name that is only a unit ("1 tablespoon" read as 1 "tablespoon").
+_UNIT_ONLY_RE = re.compile(r"^(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|ounces?|oz|pounds?|lbs?|grams?|g|ml)\.?$",
+                           re.IGNORECASE)
+_LEADING_UNIT_RE = re.compile(r"^(cups?|tablespoons?|teaspoons?|tbsp\.?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?)\s+",
+                              re.IGNORECASE)
+_UNIT_NAMES = {"tbsp": "tablespoon", "tsp": "teaspoon", "ounce": "oz", "ounces": "oz", "pound": "lb", "pounds": "lb",
+               "lbs": "lb"}
+# A choice of amounts before the plus: "flour or 2 cups all-purpose".
+_OR_AN_AMOUNT_RE = re.compile(r"\bor\s+[\d½¼¾⅓⅔⅛]")
+# What a part names the whole of: a yolk is an egg's, juice a lemon's.
+_PART_OF = {"yolk": ("egg",), "white": ("egg",),
+            "juice": ("lemon", "lime", "orange", "grapefruit"), "zest": ("lemon", "lime", "orange", "grapefruit")}
+
+
+def _whole_named(part_name, first_name):
+    """'large yolk' -> 'large egg yolk', 'juice' -> 'lemon juice' (from a
+    first name of 'grated lemon zest'), so the part reads, and is
+    flagged, as what it is."""
+    m = re.match(r"^(.*?)(\w+)(\s*\(.*\))?$", part_name)
+    if not m:
+        return part_name
+    before, part, after = m.group(1), m.group(2), m.group(3) or ""
+    wholes = _PART_OF.get(part.lower().rstrip("s"), ())
+    if not wholes or any(w in before.lower() for w in wholes):
+        return part_name
+    whole = "egg" if wholes == ("egg",) else next((w for w in wholes if w in first_name), None)
+    return f"{before}{whole} {part}{after}" if whole else part_name
+
+
+def split_plus(ing, strategy):
+    """One parsed ingredient as the ingredients its line names. "3 large
+    eggs plus 1 large egg yolk" is 3 eggs and 1 yolk, each scaled on its
+    own (before 1.1.2 the yolk's 1 was part of the name and never
+    scaled). What follows "plus" goes back through the book's own line
+    parser; the line is left as it is when that fails, or the plus is
+    inside a choice of amounts ("flour or 2 cups all-purpose plus ...")
+    or parentheses ("8 ounces eggs (4 large eggs plus 1 large yolk)",
+    where the weight covers both), or the second part is a bare count
+    after "and" ("2 limes, 1 halved and 1 quartered"). A second amount
+    with no name of its own ("olive oil, plus 1 tablespoon") is more of
+    the first ingredient."""
+    name = ing.get("name") or ""
+    m = None if ing.get("unmeasured") else _SECOND_AMOUNT_RE.search(name)
+    if not m:
+        return [ing]
+    first, rest = name[:m.start()].rstrip(" ,"), name[m.end():]
+    outside_parens = re.sub(r"\([^)]*\)", "", first)
+    if (not re.search(r"[a-z]", outside_parens, re.IGNORECASE) or _OR_AN_AMOUNT_RE.search(first)
+            or first.count("(") != first.count(")") or re.match(r"to\b", first)):
+        return [ing]
+    book = profile_for(strategy)
+
+    def parse(line):
+        found = book.parse_ingredient_line(line) or parse_fallback(line, book.parse_ingredient_line)
+        named = found and found.get("name") and not _UNIT_ONLY_RE.match(found["name"])
+        if not named or found.get("unmeasured"):
+            return None
+        # A book whose lines lead with grams reads "1 tablespoon olive
+        # oil" as 1 "tablespoon olive oil": the unit goes back where it
+        # belongs.
+        unit = _LEADING_UNIT_RE.match(found["name"])
+        if unit and not found.get("imperial_unit") and not found.get("metric_amount"):
+            word = unit.group(1).lower().rstrip(".")
+            found = dict(found, name=found["name"][unit.end():],
+                         imperial_unit=_UNIT_NAMES.get(word, word.rstrip("s")))
+        return found
+    second = parse(rest) or parse(f"{rest} {' '.join(outside_parens.split())}")
+    if not second:
+        return [ing]
+    if m.group(1) == "and" and not second.get("imperial_unit") and not second.get("metric_amount"):
+        return [ing]
+    second = dict(second, name=_whole_named(second["name"], first.lower()), plus=True)
+    return [dict(ing, name=first), second]

@@ -99,12 +99,12 @@ class PanScaleFactorTest(unittest.TestCase):
     def test_missing_original(self):
         factor, reason = pan_scale_factor("Serves 8", "my 8x8 pan")
         self.assertIsNone(factor)
-        self.assertIn("recipe's own yield line", reason)
+        self.assertIn("doesn't say what size pan", reason)
 
     def test_missing_target(self):
         factor, reason = pan_scale_factor("a 9x9 pan", "mine is bigger")
         self.assertIsNone(factor)
-        self.assertIn("your request", reason)
+        self.assertIn("pan size in what you asked", reason)
 
 
 class PanScaleFactorFromQuestionTest(unittest.TestCase):
@@ -134,12 +134,12 @@ class PanScaleFactorFromQuestionTest(unittest.TestCase):
     def test_one_pan(self):
         factor, reason = pan_scale_factor_from_question("an 8 inch pan")
         self.assertIsNone(factor)
-        self.assertIn("Found 1 pan size(s)", reason)
+        self.assertIn("I need two pan sizes", reason)
 
     def test_three_pans(self):
         factor, reason = pan_scale_factor_from_question("8x8, 9x9 and 9x13")
         self.assertIsNone(factor)
-        self.assertIn("Found 3 pan sizes", reason)
+        self.assertIn("You mentioned 3 pan sizes", reason)
 
 
 class DetectPanRequestTest(unittest.TestCase):

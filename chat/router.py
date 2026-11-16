@@ -61,6 +61,7 @@ ORIGINAL_RE = re.compile(r"\b(original|as written|recipe'?s (?:own )?amounts|bac
 QUESTION_RE = re.compile(r"^\s*(how|what|when|why|where|which|who|can|could|should|do|does|did|is|are|"
                          r"will|would)\b|\?\s*$", re.I)
 SCALE_CUE_RE = re.compile(r"\b(scale|scaled|rescale|for \d+|feeds?|serves?|servings?|people|guests|"
+                          r"enough for|crowd of \d+|for a crowd|"
                           r"only have|only got|have only|i just have|i have just|make (?:it|this|that) for)\b", re.I)
 # Scaling said outright, which "show me ..." doesn't override ("show me
 # it doubled"), unlike "double" alone, which can be part of a name
@@ -103,6 +104,13 @@ LIST_RES = tuple(re.compile(p, re.I) for p in (
     r"^\s*(?:show(?:\s+me)?|list)\s+(?:(?:the|my)\s+)?(.+?)\s+recipes\b",
     r"^\s*all\s+(?:the\s+|my\s+)?(.+?)\s+recipes\s*[.!?]?\s*$",
 ))
+# Words no ingredient name has, so a comma message with one in any piece
+# is a sentence ("i don't like this one, show me the one from dessert
+# person"), not a list of what she has.
+NOT_INGREDIENT_WORDS = frozenset("""i i'm im me my you your we us it it's its this that these those one ones
+    show like want make need give find get see look don't dont do does did is are was were can could would should
+    please recipe recipes from bigger smaller enough crowd instead other another""".split())
+MAX_INGREDIENT_WORDS = 4
 _LEADING_RE = re.compile(r"^\s*(?:with|the|my|some|any|a|an|also)\s+", re.I)
 _TRAILING_RE = re.compile(r"\s+(?:too|as\s+well|also|instead)\s*$", re.I)
 
@@ -212,6 +220,13 @@ def clean_items(text):
     while _LEADING_RE.match(text):
         text = _LEADING_RE.sub("", text, count=1)
     return parse_have(re.sub(r"\b(?:the|my|some|any)\s+", "", text, flags=re.I))
+
+
+def looks_like_ingredient(item):
+    """Whether one piece of a comma message could be an ingredient she
+    has: a few words, none of them NOT_INGREDIENT_WORDS."""
+    words = re.findall(r"[\w']+", item.lower())
+    return 0 < len(words) <= MAX_INGREDIENT_WORDS and not NOT_INGREDIENT_WORDS & set(words)
 
 
 def mostly_title(message, candidate):
@@ -442,7 +457,7 @@ class Router:
         if "," in message and not named_one and not scale_cues(message) and not ASK_RE.search(message) \
                 and not is_question(message):
             items = clean_items(message)
-            if len(items) > 1:
+            if len(items) > 1 and all(looks_like_ingredient(i) for i in items):
                 return run(items, "list")
         return None
 

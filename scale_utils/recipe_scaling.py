@@ -21,11 +21,13 @@ involving the model, rather than trusting a structured-output call to
 get the easy case right.
 """
 
+import math
 import re
 
 from common import models
 from common.word_list_loader import load_universal
-from scale_utils.scaling_rules import check_ingredient_flags
+from scale_utils.measurement_display import to_teaspoons
+from scale_utils.scaling_rules import check_ingredient_flags, whole_item
 
 SCALE_INTENT_TOOL = {
     "type": "function",
@@ -155,8 +157,13 @@ def detect_direct_multiplier(question):
     Returns a float, or None if nothing unambiguous was found (in which
     case the request needs the model's judgment after all).
     """
-    q = question.lower()
+    q = without_named_multipliers(question.lower())
     words = load_universal("direct_multipliers.json", {"words": _DEFAULT_MULTIPLIERS}).get("words", _DEFAULT_MULTIPLIERS)
+
+    # "half again as much" is half as much again, 1.5x; checked before
+    # the plain "half" below.
+    if re.search(r"\bhalf\s+again\b", q):
+        return 1.5
 
     for word, factor in words.items():
         if re.search(rf"\b{word}\b", q):
@@ -166,11 +173,27 @@ def detect_direct_multiplier(question):
     if m:
         return float(m.group(1))
 
-    m = re.search(r"\bscale(?:d)?\s+by\s+(\d+(?:\.\d+)?)\b", q)
+    # "scale by 3", "scale that by 3", "scale the recipe up by 3".
+    # "scale it down by 3" is left to the model: a third, or 3 fewer?
+    m = re.search(r"\bscaled?\s+(?:(?:it|that|this|them|the\s+recipe)\s+)?(?:up\s+)?by\s+(\d+(?:\.\d+)?)\b", q)
     if m:
         return float(m.group(1))
 
     return None
+
+
+_DEFAULT_NOT_MULTIPLIERS = ["half and half", "half-and-half", "half & half", "double cream"]
+
+
+def without_named_multipliers(text):
+    """The text with names that contain a multiplier word but aren't one
+    taken out (word_lists/universal/not_multipliers.json): "half and
+    half" is cream, "a double boiler" is a pan."""
+    phrases = load_universal("not_multipliers.json", {"phrases": _DEFAULT_NOT_MULTIPLIERS}).get(
+        "phrases", _DEFAULT_NOT_MULTIPLIERS)
+    for phrase in phrases:
+        text = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", " ", text, flags=re.IGNORECASE)
+    return text
 
 
 def normalize_basis(intent):
@@ -212,15 +235,20 @@ MIN_SANE_FACTOR = 0.05  # scaling below 1/20th is almost certainly a misread, no
 MAX_SANE_FACTOR = 20    # scaling above 20x likewise
 
 
+TRY_INSTEAD = 'Try "double it", "make it for 8", or how much of one ingredient you have ("I only have 2 eggs").'
+
+
 def _check_sane(factor, explanation):
     """Reject an internally-plausible-looking but almost certainly wrong
     factor before it ever reaches the multiplication step. A model
     misreading a yield line's own two numbers as "before" and "after"
     (as happened in testing) produces a factor that passed every earlier
     check yet was still nonsense, this catches that class of failure.
+    The refusal is worded for her; the -d flag shows the model's numbers.
     """
     if factor < MIN_SANE_FACTOR or factor > MAX_SANE_FACTOR:
-        return None, f"{explanation} — this factor is outside a sane range, likely a misread, not applying it"
+        return None, (f"That works out to {factor:.3g} times the recipe, which is more likely a misreading than "
+                      f"what you meant, so I didn't scale it. {TRY_INSTEAD}")
     return factor, explanation
 
 
@@ -243,6 +271,155 @@ def yield_measure_numbers(yield_line):
     return numbers
 
 
+# What follows a number that isn't a count: a weight or volume, a size,
+# a time, a temperature, a multiplier.
+_NOT_A_COUNT_RE = re.compile(rf"\s*(?:-\s*)?(?:(?:{_MEASURE_UNIT}|inch(?:es)?|cm|x|min(?:ute)?s?|hours?|"
+                             r"degrees?)\b|[\"%°])", re.IGNORECASE)
+_COUNT_CANDIDATE_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])")
+
+
+_NUMBER_WORDS = {w: i for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+    "seventeen eighteen nineteen twenty".split())}
+_NUMBER_WORD_RE = re.compile(r"\b(" + "|".join(_NUMBER_WORDS) + r")\b", re.IGNORECASE)
+# "this one", "the one from ...": not a number.
+_BEFORE_A_PRONOUN_ONE_RE = re.compile(r"\b(?:this|that|the|which|each|another|a|any|every|other)\s+$", re.IGNORECASE)
+
+
+def with_digits(text):
+    """Number words as digits, so "it feeds five, make it for eight" reads
+    like "it feeds 5, make it for 8"; "a dozen" is 12 ("3 dozen" is left
+    for the model). "this one" isn't a number."""
+    text = re.sub(r"\ba\s+dozen\b", "12", text or "", flags=re.IGNORECASE)
+
+    def digit(m):
+        word = m.group(1).lower()
+        if word == "one" and _BEFORE_A_PRONOUN_ONE_RE.search(text[:m.start()]):
+            return m.group(0)
+        return str(_NUMBER_WORDS[word])
+    return _NUMBER_WORD_RE.sub(digit, text)
+
+
+def count_numbers(question):
+    """The numbers in a request that count something (people, servings,
+    pieces): 5 and 8 in "this usually feeds 5 people, make it feed 8",
+    but not 9 in "a 9-inch pan" or 200 in "200 g". Number words count
+    too (with_digits)."""
+    question = with_digits(question)
+    return [float(m.group(1)) for m in _COUNT_CANDIDATE_RE.finditer(question or "")
+            if not _NOT_A_COUNT_RE.match(question[m.end():])]
+
+
+# How much the recipe makes, as she says it: "it usually feeds 5", "this
+# serves 8", "the recipe makes 12". Only the -s forms: "make it feed 8"
+# is the target, not the original.
+_ORIGINAL_YIELD_RE = re.compile(r"\b(?:feeds|serves|makes|yields|is\s+(?:enough\s+)?for)\s+"
+                                r"(?:about\s+|around\s+|roughly\s+|up\s+to\s+)?(\d+(?:\.\d+)?)(?![\w.])",
+                                re.IGNORECASE)
+# Words that make the second number something other than a new total:
+# "3 dozen", "2 batches", "4 more people".
+_NOT_A_TOTAL_RE = re.compile(r"\b(dozen|batch(?:es)?|more|extra|additional|another)\b", re.IGNORECASE)
+
+
+def detect_stated_yield(question):
+    """How much the recipe makes and how much she wants, when she says
+    both ("it usually feeds 5, make it feed 8" -> (5.0, 8.0)), read
+    without the model: the model tends to take the recipe's yield line
+    over her number. None unless the request has exactly two counts and
+    says which one is the recipe's; anything else goes to the model."""
+    question = with_digits(question)
+    originals = [float(m.group(1)) for m in _ORIGINAL_YIELD_RE.finditer(question)]
+    counts = count_numbers(question)
+    if len(originals) != 1 or len(counts) != 2 or originals[0] not in counts or _NOT_A_TOTAL_RE.search(question):
+        return None
+    counts.remove(originals[0])
+    return originals[0], counts[0]
+
+
+def stated_yield_factor(question):
+    """(factor, explanation) for a request detect_stated_yield reads,
+    else None."""
+    stated = detect_stated_yield(question)
+    if stated is None:
+        return None
+    original, target = stated
+    return _check_sane(target / original, f"Yield scaling (as you stated it): {target:g} ÷ {original:g} "
+                                          f"= {target / original:.3f}x")
+
+
+# Her amount and its unit: "50 g", "2 cups", "1" (in "1 egg").
+_STATED_AMOUNT_RE = re.compile(r"(?<![\w./])(\d+/\d+|\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|milliliters?|l|"
+                               r"liters?|cups?|oz|ounces?|pounds?|lbs?|tablespoons?|teaspoons?|tbsp|tsp)?\b",
+                               re.IGNORECASE)
+_GRAMS = {"g": 1, "gram": 1, "kg": 1000, "kilogram": 1000, "oz": 28.35, "ounce": 28.35,
+          "lb": 453.6, "pound": 453.6}
+_ML = {"ml": 1, "milliliter": 1, "l": 1000, "liter": 1000}
+_ML_PER_TSP = 4.929
+
+
+def _singular(unit):
+    unit = (unit or "").lower().rstrip(".")
+    return unit[:-1] if unit.endswith("s") and unit[:-1] in _GRAMS | _ML else unit
+
+
+def stated_unit(question, amount):
+    """The unit she gave her amount in ("I only have 50 g of butter" ->
+    "g"), or None for a count ("I only have 1 egg") or an amount not
+    written as a number."""
+    for m in _STATED_AMOUNT_RE.finditer(question or ""):
+        num = m.group(1)
+        value = float(num.split("/")[0]) / float(num.split("/")[1]) if "/" in num else float(num)
+        if abs(value - amount) < 1e-9:
+            return _singular(m.group(2)) or None
+    return None
+
+
+def comparable_amounts(ing, amount, unit):
+    """(her amount, the recipe's amount, the recipe's amount as printed)
+    with the first two in the same unit, or None when the line has
+    nothing to compare her unit with. A count ("1 egg") goes against the
+    line's count ("2 large eggs" in "100 g / 2 large eggs"), grams
+    against grams, cups against cups."""
+    metric, metric_unit = ing["metric_amount"], _singular(ing["metric_unit"])
+    imperial, imperial_unit = ing["imperial_amount"], _singular(ing["imperial_unit"])
+    imperial_tsp = to_teaspoons(imperial, imperial_unit) if imperial else None
+    as_metric = f"{metric:g} {ing['metric_unit'] or ''}".strip() if metric else None
+    as_imperial = f"{imperial:g} {ing['imperial_unit'] or ''}".strip() if imperial else None
+    if unit is None:
+        if imperial and imperial_tsp is None and imperial_unit not in _GRAMS:
+            return amount, imperial, as_imperial      # a count, or "1 stick", "1 can"
+        if metric:                                     # she left the unit off
+            return amount, metric, as_metric
+        return (amount, imperial, as_imperial) if imperial else None
+    if unit in _GRAMS:
+        if metric and metric_unit in _GRAMS:
+            return amount * _GRAMS[unit], metric * _GRAMS[metric_unit], as_metric
+        if imperial and imperial_unit in _GRAMS:
+            return amount * _GRAMS[unit], imperial * _GRAMS[imperial_unit], as_imperial
+        return None
+    tsp = to_teaspoons(amount, unit)
+    ml = amount * _ML[unit] if unit in _ML else float(tsp) * _ML_PER_TSP
+    if metric and metric_unit in _ML:
+        return ml, metric * _ML[metric_unit], as_metric
+    if imperial_tsp is not None:
+        return ml / _ML_PER_TSP, float(imperial_tsp), as_imperial
+    return None
+
+
+def _measured_as(ing):
+    return " / ".join(f"{amount:g} {unit or ''}".strip() for amount, unit in
+                      ((ing["metric_amount"], ing["metric_unit"]), (ing["imperial_amount"], ing["imperial_unit"]))
+                      if amount)
+
+
+def _quoted(yield_line, longest=40):
+    """ (\"Serves 8\") to put after "makes", or nothing when the yield
+    line is missing or too long to read as one (it can run on into the
+    ingredients)."""
+    line = " ".join((yield_line or "").split())
+    return f' ("{line}")' if line and len(line) <= longest else ""
+
+
 def resolve_scale_factor(intent, ingredients, yield_line="", question=""):
     """Deterministically turn the model's reported intent into an actual
     scale factor. Returns (factor, explanation) on success,
@@ -257,41 +434,49 @@ def resolve_scale_factor(intent, ingredients, yield_line="", question=""):
     basis = normalize_basis(intent)
 
     if basis == "conflicting":
-        return None, ("The model's response mixed signals from more than one "
-                       "scaling type at once, which usually means it misread "
-                       "something. Try rephrasing more simply, e.g. \"double it\".")
+        return None, f"I couldn't tell how you want to scale this. {TRY_INSTEAD}"
 
     if basis == "direct":
         factor = intent.get("direct_multiplier")
         if not factor:
-            return None, "No multiplier was given"
+            return None, f"I couldn't tell how much to scale it by. {TRY_INSTEAD}"
         return _check_sane(factor, f"Direct multiplier: {factor}x")
 
     if basis == "yield":
         target = intent.get("target_yield")
         original = intent.get("original_yield")
-        stated = {float(n) for n in _NUMBER_RE.findall(question or "")}
+        stated = {float(n) for n in _NUMBER_RE.findall(with_digits(question))}
+        # She gave both numbers ("it feeds 5, make it feed 8") but the
+        # model took the original from the yield line ("SERVES 8", so
+        # 8 -> 8): use hers.
+        counts = count_numbers(question)
+        if target and original and len(counts) == 2 and target in counts and \
+                (original not in counts or (original == target and counts[0] != counts[1])):
+            counts.remove(target)
+            original = counts[0]
         in_line = {float(n) for n in _NUMBER_RE.findall(yield_line or "")}
         if re.search(r"\bdozen\b", yield_line or "", re.IGNORECASE):
             in_line |= {12 * n for n in in_line} | {12.0}
         # A yield neither the recipe nor she stated was made up.
         if original and yield_line and original not in in_line | stated:
-            return None, (f"I couldn't find how much the recipe makes (read it as {original:g}, which isn't in "
-                          f'"{yield_line.strip()}"). Try a multiplier ("double it") or how much of one ingredient '
-                          f"you have")
+            return None, (f"I couldn't tell how many this recipe makes{_quoted(yield_line)}. Tell me how many it "
+                          f'feeds ("it feeds 6, make it for 10"), or try "double it".')
         if target and (not original or (original in yield_measure_numbers(yield_line) and original not in stated)):
-            return None, ("the recipe's yield isn't a number of servings or pieces, so I can't scale it to "
-                          f"{target:g}. Try a multiplier (\"double it\") or how much of one ingredient you have")
+            return None, (f"This recipe says how much it makes as an amount{_quoted(yield_line)}, not as servings "
+                          f"or pieces, so I can't scale it to {target:g}. Tell me how many it feeds (\"it feeds 6, "
+                          f"make it for 10\"), or try \"double it\" or how much of one ingredient you have.")
         if not target or not original:
-            return None, "Missing target or original yield"
+            return None, ('I couldn\'t tell how many the recipe makes or how many you want. Try "it feeds 6, '
+                          'make it for 10".')
         factor = target / original
-        return _check_sane(factor, f"Yield scaling: {target} \u00f7 {original} = {factor:.3f}x")
+        return _check_sane(factor, f"Yield scaling: {target:g} \u00f7 {original:g} = {factor:.3f}x")
 
     if basis == "ingredient_constraint":
         ref = (intent.get("reference_ingredient") or "").strip().lower()
         target_amt = intent.get("target_ingredient_amount")
         if not ref or not target_amt:
-            return None, "Missing reference ingredient or target amount"
+            return None, ('I couldn\'t tell which ingredient you mean or how much of it you have. Try '
+                          '"I only have 2 eggs".')
 
         # An ingredient with no amount ("Egg wash", "Butter for the pan")
         # can't set a scale factor, and leaving it out keeps "I only have
@@ -299,21 +484,24 @@ def resolve_scale_factor(intent, ingredients, yield_line="", question=""):
         matches = [ing for ing in ingredients
                    if ref in ing["name"].lower() and not ing.get("unmeasured")]
         if not matches:
-            return None, f'Could not find "{ref}" in this recipe\'s ingredients'
+            return None, f'This recipe doesn\'t seem to use "{ref}", so I can\'t scale it by that.'
         if len(matches) > 1:
             return "ambiguous", [m["name"] for m in matches]
 
         matched = matches[0]
-        original_amt = matched["metric_amount"] or matched["imperial_amount"]
-        if not original_amt:
-            return None, f'Found "{matched["name"]}" but couldn\'t read its amount'
-        factor = target_amt / original_amt
-        return _check_sane(factor, (
-            f'Ingredient scaling: {matched["name"]} '
-            f'{target_amt} \u00f7 {original_amt} = {factor:.3f}x'
-        ))
+        if not (matched["metric_amount"] or matched["imperial_amount"]):
+            return None, f'I couldn\'t read how much {matched["name"]} the recipe calls for, so I can\'t scale by it.'
+        unit = stated_unit(question, target_amt)
+        amounts = comparable_amounts(matched, target_amt, unit)
+        if amounts is None:
+            return None, (f'The recipe measures {matched["name"]} as {_measured_as(matched)}, which I can\'t '
+                          f'compare with {target_amt:g} {unit}. Try giving it in one of those units.')
+        have, original_amt, printed = amounts
+        factor = have / original_amt
+        yours = f"{target_amt:g} {unit}" if unit else f"{target_amt:g}"
+        return _check_sane(factor, f'Ingredient scaling: {matched["name"]} {yours} \u00f7 {printed} = {factor:.3f}x')
 
-    return None, f"Unrecognized basis: {basis!r}"
+    return None, f"I couldn't tell how you want to scale this. {TRY_INSTEAD}"
 
 
 def _round_to_increment(value, increment):
@@ -355,6 +543,8 @@ def scale_ingredients(ingredients, factor):
             scaled_metric, scaled_metric_rounded = _round_metric(ing["metric_unit"], raw)
 
         scaled_imperial = ing["imperial_amount"] * factor if ing["imperial_amount"] else None
+        flags = check_ingredient_flags(ing["name"])
+        scaled_imperial, rounded_whole = _whole(ing, scaled_imperial, factor, flags)
 
         scaled.append({
             "name": ing["name"],
@@ -366,8 +556,32 @@ def scale_ingredients(ingredients, factor):
             "scaled_metric": scaled_metric,
             "scaled_metric_rounded": scaled_metric_rounded,
             "scaled_imperial": scaled_imperial,
+            "scaled_imperial_rounded": rounded_whole,
             "qualifier": ing.get("qualifier"),
             "unmeasured": ing.get("unmeasured", False),
-            "flags": check_ingredient_flags(ing["name"]),
+            "plus": ing.get("plus", False),
+            "flags": flags,
         })
     return scaled
+
+
+def _whole(ing, scaled_imperial, factor, flags):
+    """A scaled count of something that only comes whole: a crust stays
+    as the recipe has it, a can or a pinch is rounded to a whole number
+    (at least 1). Adds a note to flags when that changes much. Returns
+    (scaled_imperial, was_rounded)."""
+    kind = whole_item(ing) if scaled_imperial and factor != 1 else None
+    if kind is None:
+        return scaled_imperial, False
+    what, note = kind
+    if what == "not_scaled":
+        flags.append(("non_scalable", note))
+        return ing["imperial_amount"], False
+    whole = max(1, math.floor(scaled_imperial + 0.5))
+    off = abs(whole - scaled_imperial)
+    if (what == "whole" and off > 0.1 * scaled_imperial) or (what == "exact" and off > 0.005):
+        exact = f"{scaled_imperial:.2f}".rstrip("0").rstrip(".")
+        flags.append(("rounded", f"Rounded up to {whole}; the exact amount is {exact}, so use part of the last one "
+                                 f"if it matters." if whole > scaled_imperial else
+                                 f"Rounded down to {whole}; the exact amount is {exact}."))
+    return whole, abs(whole - scaled_imperial) > 1e-9

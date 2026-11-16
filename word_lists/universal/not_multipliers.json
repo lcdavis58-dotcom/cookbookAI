@@ -1,0 +1,18 @@
+{
+  "_comment": "Names that contain a multiplier word (direct_multipliers.json) but don't mean scaling: 'do any of these use half and half' is about an ingredient, not halving. Taken out of a request before multiplier words are looked for. Matched as whole words, case ignored. Add entries as you notice more.",
+  "phrases": [
+    "half and half",
+    "half-and-half",
+    "half & half",
+    "half n half",
+    "half 'n' half",
+    "double cream",
+    "double boiler",
+    "double-crust",
+    "double crust",
+    "half sheet",
+    "half-sheet",
+    "quarter sheet",
+    "quarter-sheet"
+  ]
+}

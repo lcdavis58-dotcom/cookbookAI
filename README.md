@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.1.1
+Version 1.1.2
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
@@ -52,7 +52,7 @@ In a chat, "what pumpkin pie recipes do I have" lists every recipe with those wo
 python3 query.py "What page has the recipe for sweet tart dough?"
 ```
 
-**Scale a recipe** (`scale.py`): by a multiplier, to a target yield, to a pan size, or to fit an ingredient you're short on. Amounts are converted to measuring tools you actually own, and ingredients that shouldn't scale linearly are flagged.
+**Scale a recipe** (`scale.py`): by a multiplier, to a target yield, to a pan size, or to fit an ingredient you're short on. Amounts are converted to measuring tools you actually own, and ingredients that shouldn't scale linearly are flagged. A yield you state ("it usually feeds 5", "feeds five") is used over the recipe's own, and an amount you have is compared in its own unit (1 egg against the eggs, not their grams). A line naming two ingredients ("3 large eggs plus 1 large egg yolk", "lemon zest plus 1 teaspoon juice") scales both. Things that only come whole (`ingredient_rules/whole_items.json`) are rounded to whole eggs, cans, jars or pinches, with the exact amount in a note, and a crust isn't scaled at all, with a note that more or less filling usually means a different pan.
 
 ```
 python3 scale.py "please double the classic whipped cream recipe"
@@ -181,7 +181,6 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.1.2:** understand what's asked for: stop reading some sentences as ingredient lists ("..., show me the one from dessert person") or "half and half" as halving, scale to a number of people from the servings you say the recipe makes ("it usually feeds 5"), scale by a count you have ("I only have 1 egg") when the recipe also gives that ingredient's weight, read "half again as much" and "scale that by 3", stop scaling a pie crust or a pinch of salt to "~1.12 whole", and word scaling refusals plainly
 - **1.1.3:** find the right recipe: "butter cream" finds Buttercream, say when a recipe was found through its variation, show a recipe named in part ("the extra-thick one"), answer a question that names a recipe instead of showing it, see results past the first 15, and better ordering when results tie
 - **1.2.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together (including listing every recipe of a dish, not just the closest titles)
 - **1.3.0:** show chat replies word by word, lay recipes out more readably on the website
