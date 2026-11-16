@@ -56,9 +56,11 @@ NUMBERED_STEP_RE = re.compile(r"^\d+\.\s")
 _IMP_UNIT = r"(?:packed\s+cups?|cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?)\b"
 METRIC_SLASH_RE = re.compile(
     rf"^(?P<metric_amt>\d+\.\d+|[\d{FRACTION_CHARS}]+)\s*(?P<metric_unit>g|kg|ml|l)\s*/\s*"
-    rf"(?P<imp_amt>[\d{FRACTION_CHARS}]+)?\s*"
+    # "42 g / 1.5 oz / 3 tablespoons" (The Fearless Baker): decimals too,
+    # or the "1" was the amount and ".5 oz / 3 tablespoons" the name.
+    rf"(?P<imp_amt>\d+\.\d+|[\d{FRACTION_CHARS}]+)?\s*"
     rf"(?P<imp_unit>{_IMP_UNIT})?\s*"
-    rf"(?:/\s*(?P<imp2_amt>[\d{FRACTION_CHARS}]+)\s*(?P<imp2_unit>{_IMP_UNIT})\s*)?"
+    rf"(?:/\s*(?P<imp2_amt>\d+\.\d+|[\d{FRACTION_CHARS}]+)\s*(?P<imp2_unit>{_IMP_UNIT})\s*)?"
     rf"(?P<name>.+)$",
     re.IGNORECASE,
 )
@@ -138,7 +140,15 @@ _COMPOUND_RE = re.compile(
 # cinnamon sticks", "1 (750 ml) bottle dry rosé wine".
 # A count range scales from its low end too ("4–6 slices bacon"), and an
 # amount can be glued to its word ("⅛ounce dried porcini").
-_PAREN_COUNT_RE = re.compile(rf"^({AMOUNT})(?:\s*[–-]\s*{AMOUNT}(?=\s))?\s*(?=[A-Za-z(])")
+_PAREN_COUNT_RE = re.compile(rf"^({AMOUNT})((?:\s*[–-]\s*{AMOUNT}(?=\s))?)\s*(?=[A-Za-z(])")
+# A weight: "8 ounces unsalted butter (2 sticks)" (Ratio), "3½ ounces
+# (100g) bittersweet chocolate" (Genius Desserts), "1 pound fresh
+# spinach leaves" (HTCEV). Read as a count, it scaled as "ounces
+# unsalted butter: 8 whole -> 16 whole".
+_PAREN_WEIGHT_RE = re.compile(rf"^({AMOUNT})({_RANGE_END})\s*(ounces?|oz|pounds?|lbs?)\b\.?\s+", re.IGNORECASE)
+# Big volumes measuring cups can't make, shown as counted units ("1
+# gallon -> 2 gallons"): "1 gallon milk" (HTCEV).
+_BIG_VOLUME_RE = re.compile(r"(gallon|quart|pint)s?\s+", re.IGNORECASE)
 
 
 def volume_paren_metric(line):
@@ -203,6 +213,21 @@ def volume_paren_metric(line):
             if imperial_amount is None:
                 return None
             name = line[single.end():].strip()
+        elif weight := _PAREN_WEIGHT_RE.match(line):
+            amount = parse_typed_amount(weight.group(1))
+            if amount is None:
+                return None
+            name = line[weight.end():].strip()
+            unit = "pound" if weight.group(3).lower().startswith(("p", "l")) else "ounce"
+            if metric_amount is None:
+                # The weight is all there is, so it's the weight side, in
+                # the book's own unit, as BraveTart's are.
+                metric_amount, metric_unit = amount, "lb" if unit == "pound" else "oz"
+                imperial_amount = imperial_unit = None
+            else:
+                # Grams are printed too: the ounces are the US side.
+                imperial_amount, imperial_unit = amount, unit
+                imperial_display = _GLUED_FRACTION_RE.sub(r"\1 \2", line[:weight.end()].strip())
         else:
             fallback = _PAREN_COUNT_RE.match(line)
             if not fallback:
@@ -212,6 +237,12 @@ def volume_paren_metric(line):
                 return None
             imperial_unit = None
             name = line[fallback.end():].strip()
+            if big := _BIG_VOLUME_RE.match(name):
+                imperial_unit = big.group(1).lower()
+                name = name[big.end():].strip()
+            if fallback.group(2):
+                # "4–6 slices bacon" scales from 4, but shows as printed.
+                imperial_display = _GLUED_FRACTION_RE.sub(r"\1 \2", line[:fallback.end()].strip())
 
     return {
         "raw": original,

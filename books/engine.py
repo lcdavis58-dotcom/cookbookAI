@@ -26,6 +26,18 @@ Headings are told by size alone, so a book's settings say only:
     TITLE_MAX_GAP       a heading line further below the one above than
                         this (points) starts a heading of its own (a
                         section name right above a recipe title)
+    TITLE_THEN_INGREDIENTS
+                        True if a title with no yield line, followed
+                        right away by an ingredient line, is a recipe
+                        too: a sauce printed after the recipe that uses
+                        it ("Salted Caramel Sauce" / "298 g / 1½ cups
+                        granulated sugar", The Fearless Baker)
+    COMPONENT_TITLE_MIN_SIZE
+                        the smallest size of a bold line, below title
+                        size, that starts a recipe when a yield line comes
+                        right after it: a component printed inside another
+                        recipe ("Caesar Salad Dressing" / "MAKES ABOUT 1½
+                        CUPS", The Food Lab). None by default.
 
 Sizes are compared against thresholds, never exact values: some books
 scale a page about 1% smaller (BraveTart's 24.7 / 14.8).
@@ -103,10 +115,39 @@ def find_recipe_starts_by_size(lines, layout, settings):
     ranges = headings.ranges
     for n, (first, last) in enumerate(ranges):
         next_heading = ranges[n + 1][0] if n + 1 < len(ranges) else len(lines)
-        if any(yield_re.match(lines[k].strip()) for k in range(last + 1, next_heading)):
+        if (any(yield_re.match(lines[k].strip()) for k in range(last + 1, next_heading))
+                or (getattr(settings, "TITLE_THEN_INGREDIENTS", False)
+                    and _ingredients_follow(lines, last + 1, next_heading, settings))):
             starts.append(first)
             consumed.update(range(first, last + 1))
+    component_size = getattr(settings, "COMPONENT_TITLE_MIN_SIZE", None)
+    if component_size is not None:
+        for i in range(len(layout) - 1):
+            if i not in consumed and _is_component_title(layout[i], component_size, settings.TITLE_MIN_SIZE) \
+                    and yield_re.match(lines[i + 1].strip()):
+                starts.append(i)
+                consumed.add(i)
+        starts.sort()
     return starts, consumed, headings
+
+
+def _ingredients_follow(lines, start, end, settings):
+    """Whether the first line after a title is an ingredient, read by the
+    book's own parser (not the fallbacks). An ALL-CAPS line is a table of
+    contents or a cover ("650 RECIPES FOR..."), never one."""
+    first = next((lines[k].strip() for k in range(start, end) if lines[k].strip()), "")
+    # A book module passed as is (Cooking For Two) names its style only.
+    parse = getattr(settings, "parse_ingredient_line", None) or STYLES[settings.INGREDIENT_STYLE]
+    return bool(first) and first != first.upper() and bool(parse(first))
+
+
+# A component's title: short, starting with a capital, not a sentence.
+_COMPONENT_TITLE_RE = re.compile(r"^[A-Z][^.:;!?]{1,60}$")
+
+
+def _is_component_title(record, min_size, title_size):
+    return (record.get("bold") and min_size - SIZE_TOLERANCE <= record["size"] < title_size - SIZE_TOLERANCE
+            and bool(_COMPONENT_TITLE_RE.match(record["text"].strip())))
 
 
 def section_starts_by_size(headings, consumed):
@@ -202,9 +243,11 @@ def _is_listed(line, parse, max_unmeasured_chars, purpose_re):
 # The functions a book module can define to replace the engine's.
 INTERFACE = {
     "find_recipe_starts", "find_section_starts", "extract_title", "parse_ingredient_line",
-    "ingredient_start", "ingredient_end", "is_continuation", "section_label", "list_end_lines",
+    "ingredient_start", "ingredient_end", "is_continuation", "starts_new_line", "section_label",
+    "list_end_lines",
 }
 _SUBTITLE_RE = re.compile(r"^with\s+\S")
+_WAYS_TAIL_RE = re.compile(r",\s*(?:\d+|[A-Za-z]+)\s+Ways$", re.IGNORECASE)
 _WITH_TAIL_RE = re.compile(r"\s+with\s+", re.IGNORECASE)
 
 
@@ -252,6 +295,7 @@ class Profile:
     INGREDIENTS_AFTER_RE = None
     INGREDIENTS_RIGHT_AFTER = False
     TITLE_ALIASES = {}
+    TITLE_THEN_INGREDIENTS = False
 
     def __init__(self, module):
         self.module = module
@@ -309,10 +353,16 @@ class Profile:
     def title_aliases(self, title):
         """The extra titles TITLE_ALIASES gives a recipe, looked up by its
         printed title regardless of case and spacing (the book prints
-        "FAVORITE THIN AND CRISPY")."""
+        "FAVORITE THIN AND CRISPY"). A title ending in ", 11 Ways" or
+        ", Three Ways" (HTCEV's "Béchamel Sauce, 11 Ways") can also be
+        found without that tail, which other recipes leave out
+        ("1 recipe Béchamel")."""
         key = " ".join((title or "").lower().split())
-        return [alias for printed, aliases in self.TITLE_ALIASES.items()
-                if " ".join(printed.lower().split()) == key for alias in aliases]
+        aliases = [alias for printed, aliases in self.TITLE_ALIASES.items()
+                   if " ".join(printed.lower().split()) == key for alias in aliases]
+        if m := _WAYS_TAIL_RE.search(title or ""):
+            aliases.append(title[:m.start()].strip())
+        return aliases
 
     def ingredient_start(self, lines):
         """Where the ingredient list begins: after the yield block (or the
@@ -323,6 +373,12 @@ class Profile:
         anchor = self.INGREDIENTS_AFTER_RE or self.YIELD_RE
         at = next((i for i, line in enumerate(lines) if anchor.match(line.strip())), None)
         if at is None:
+            # A recipe with no yield line (TITLE_THEN_INGREDIENTS): the
+            # list starts right under its title. A later part of a split
+            # recipe starts with step text, not a title then an ingredient.
+            if (self.TITLE_THEN_INGREDIENTS and len(lines) > 1 and not self.parse_ingredient_line(lines[0].strip())
+                    and self.parse_ingredient_line(lines[1].strip())):
+                return 1
             return len(lines)
         after = at + yield_block_length(lines, at, self.HEADER_FIELD_RE)
         if self.INGREDIENTS_RIGHT_AFTER:
@@ -368,6 +424,11 @@ class Profile:
     def is_continuation(self, pending, last_line, line):
         """More ways a line can be the wrap of the ingredient line before
         it, beyond the shared ones; none by default."""
+        return False
+
+    def starts_new_line(self, line):
+        """Whether a line the shared rules would take for a wrap (it starts
+        lowercase) is an ingredient of its own; never by default."""
         return False
 
     def section_label(self, line):

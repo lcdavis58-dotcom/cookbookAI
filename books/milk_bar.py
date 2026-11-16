@@ -22,6 +22,7 @@ import re
 
 from books.engine import end_of_unmarked_list
 from books.line_styles import STYLES
+from scale_utils.line_fallbacks import unmeasured_result
 
 TITLE_MIN_SIZE = 21
 YIELD_RE = re.compile(r"^MAKES\b")
@@ -42,6 +43,24 @@ def is_continuation(pending, last_line, line):
     """The volume line under a weighed one: "[2 cups]", or "1½ cups]"
     where the PDF lost the opening bracket."""
     return line.startswith("[") or (line.endswith("]") and "[" not in line)
+
+
+# "milk if needed" (p343) starts lowercase like a wrap, but it's an
+# ingredient of its own: the book's lines are all lowercase.
+_IF_NEEDED_RE = re.compile(r"^[a-z][a-z ]{0,30}\s(?:if|as)\s+needed$")
+
+
+def starts_new_line(line):
+    return bool(_IF_NEEDED_RE.match(line))
+
+
+def parse_ingredient_line(line):
+    """The book's style, plus its lowercase "milk if needed", which the
+    shared fallback skips (it takes only capitalized unmeasured lines)."""
+    parsed = _parse(line)
+    if parsed is None and _IF_NEEDED_RE.match(line.strip()):
+        return unmeasured_result(line.strip())
+    return parsed
 
 
 # The layer cakes list their equipment after the ingredients:

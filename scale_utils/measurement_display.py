@@ -169,7 +169,8 @@ def format_pieces(pieces):
 # Non-volume units that need a plural form when displayed. Volume units
 # get theirs from _unit_word() inside the decomposition path above.
 COUNT_UNIT_PLURALS = {"stick": "sticks", "pinch": "pinches", "dash": "dashes",
-                      "pound": "pounds", "ounce": "ounces"}
+                      "pound": "pounds", "ounce": "ounces",
+                      "gallon": "gallons", "quart": "quarts", "pint": "pints"}
 
 
 def count_unit_label(qty, unit):

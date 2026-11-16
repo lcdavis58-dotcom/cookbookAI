@@ -77,6 +77,16 @@ def group_kind(label, book):
     return "component"
 
 
+# A wrapped line with the next ingredient after it: "sugar 11/2 cups
+# cream". Only after a word or two that end a name: not when the amount
+# belongs to the wrap ("sugar, plus 2 tablespoons", "or 1 cup", "mixed
+# with 3/4 cup water", "feed the cakes 2 tablespoons a week").
+_NEXT_INGREDIENT_RE = re.compile(
+    r"^([a-z][\w’'-]*(?:\s+[a-z][\w’'-]*)?(?<!\bplus)(?<!\bor)(?<!\bto)(?<!\babout)(?<!\band)"
+    r"(?<!\bwith)(?<!\bof)(?<!\bthe))"
+    r"\s+(\d[\d/]*\s+(?:cups?|tablespoons?|teaspoons?)\s+[a-z].*)$")
+
+
 def _is_wrapped_continuation(pending, line):
     """Whether `line` is the PDF's line-wrap of the ingredient line before
     it rather than a new line of its own. Any of three signals is enough:
@@ -241,11 +251,20 @@ def extract_ingredient_groups(chunk_text, strategy, trace=None):
             trace("after list ended", stripped)
             continue
 
-        if pending is not None and (_is_wrapped_continuation(pending, stripped)
-                                    or (hasattr(book, "is_continuation")
-                                        and book.is_continuation(pending, last_line, stripped))):
-            pending = f"{pending} {stripped}"
-            trace("joined to line above", stripped)
+        if pending is not None and not (hasattr(book, "starts_new_line") and book.starts_new_line(stripped)) \
+                and (_is_wrapped_continuation(pending, stripped)
+                     or (hasattr(book, "is_continuation") and book.is_continuation(pending, last_line, stripped))):
+            # "1/4 cup confectioners’" / "sugar 11/2 cups cream" (HTCEV):
+            # the wrap and the next ingredient printed on one line.
+            joined_next = _NEXT_INGREDIENT_RE.match(stripped) if stripped[:1].islower() else None
+            if joined_next:
+                pending = f"{pending} {joined_next.group(1)}"
+                trace("joined to line above", joined_next.group(1))
+                flush()
+                pending = stripped = joined_next.group(2)
+            else:
+                pending = f"{pending} {stripped}"
+                trace("joined to line above", stripped)
         else:
             flush()
             pending = stripped

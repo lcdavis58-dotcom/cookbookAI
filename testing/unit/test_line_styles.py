@@ -49,6 +49,13 @@ class MetricSlashTest(Fields, unittest.TestCase):
                           imperial_amount=4.0, imperial_unit="tablespoons", imperial_display="4 tablespoons",
                           name="unsalted butter")
 
+    def test_decimal_imperial(self):
+        # The "1" was read as the amount and ".5 oz / 3 tablespoons" as the name.
+        self.assertFields(metric_slash("43 g / 1.5 oz / 3 tablespoons unsalted butter"), imperial_amount=3.0,
+                          imperial_unit="tablespoons", name="unsalted butter")
+        self.assertFields(metric_slash("113 g / 4.5 oz dark chocolate"), imperial_amount=4.5, imperial_unit="oz",
+                          name="dark chocolate")
+
     def test_weight_only_imperial(self):
         self.assertFields(metric_slash("100 g / 4 ounces dark chocolate"), imperial_amount=4.0,
                           imperial_unit="ounces", name="dark chocolate")
@@ -109,7 +116,31 @@ class VolumeParenMetricTest(Fields, unittest.TestCase):
                           name="large eggs")
         self.assertFields(volume_paren_metric("2 (3-inch) cinnamon sticks"), imperial_amount=2.0,
                           name="(3-inch) cinnamon sticks")
-        self.assertFields(volume_paren_metric("4–6 slices bacon"), imperial_amount=4.0, name="slices bacon")
+        self.assertFields(volume_paren_metric("4–6 slices bacon"), imperial_amount=4.0, imperial_display="4–6",
+                          name="slices bacon")
+
+    def test_weight_alone_is_the_weight_side(self):
+        # Read as a count, this scaled as "ounces unsalted butter: 8 whole".
+        self.assertFields(volume_paren_metric("8 ounces unsalted butter (2 sticks)"), metric_amount=8.0,
+                          metric_unit="oz", imperial_amount=None, imperial_unit=None, name="unsalted butter (2 sticks)")
+        self.assertFields(volume_paren_metric("11/2 pounds fresh spinach"), metric_amount=1.5, metric_unit="lb",
+                          name="fresh spinach")
+        self.assertFields(volume_paren_metric("2 lb. carrots"), metric_amount=2.0, metric_unit="lb", name="carrots")
+
+    def test_weight_with_grams_is_the_us_side(self):
+        self.assertFields(volume_paren_metric("3½ ounces (100g) bittersweet chocolate"), metric_amount=100.0,
+                          metric_unit="g", imperial_amount=3.5, imperial_unit="ounce", imperial_display="3½ ounces",
+                          name="bittersweet chocolate")
+
+    def test_count_in_a_can_stays_a_count(self):
+        self.assertFields(volume_paren_metric("1 (14-ounce) can coconut milk"), metric_amount=None,
+                          imperial_amount=1.0, name="(14-ounce) can coconut milk")
+
+    def test_big_volumes_are_counted_units(self):
+        self.assertFields(volume_paren_metric("1/2 gallon milk"), imperial_amount=0.5, imperial_unit="gallon",
+                          name="milk")
+        self.assertFields(volume_paren_metric("2 quarts vegetable stock"), imperial_amount=2.0,
+                          imperial_unit="quart", name="vegetable stock")
 
     def test_rejects(self):
         self.assertRejects(volume_paren_metric, "", "1. Heat the oven.", "Salt")
@@ -172,6 +203,35 @@ class VolumePipeWeightTest(Fields, unittest.TestCase):
 
     def test_rejects(self):
         self.assertRejects(volume_pipe_weight, "", "1 cup | nothing", "See page 12. Then stir.")
+
+
+class WrappedLinesTest(unittest.TestCase):
+    """How scale_utils/ingredients.py joins a line's PDF wrap onto it."""
+
+    @staticmethod
+    def lines(book, *ingredient_lines, title="TEST PIE", yield_line="MAKES ONE 9-INCH / 23-CM PIE"):
+        from books import strategy_for
+        from scale_utils.ingredients import extract_ingredient_groups
+        text = "\n".join([title, yield_line, *ingredient_lines, "1. Heat the oven."])
+        return [i["raw"] for group in extract_ingredient_groups(text, strategy_for(book)).values() for i in group]
+
+    def test_wrap_with_the_next_ingredient_after_it(self):
+        # HTCEV printed "1/4 cup confectioners’" / "sugar 11/2 cups cream".
+        self.assertEqual(self.lines("The Book On Pie", "50 g / ¼ cup confectioners’", "sugar 2 cups heavy cream"),
+                         ["50 g / ¼ cup confectioners’ sugar", "2 cups heavy cream"])
+
+    def test_amount_that_belongs_to_the_wrap_stays(self):
+        self.assertEqual(self.lines("The Book On Pie", "100 g / ½ cup soy sauce mixed",
+                                    "with 3 tablespoons water", "450 g / 1 pound apples, peeled",
+                                    "about 2 cups chopped"),
+                         ["100 g / ½ cup soy sauce mixed with 3 tablespoons water",
+                          "450 g / 1 pound apples, peeled about 2 cups chopped"])
+
+    def test_milk_bar_if_needed_is_its_own_line(self):
+        # "milk if needed" was glued onto the line above (p343).
+        self.assertEqual(self.lines("Momofuku Milk Bar", "1 g black pepper [¼ teaspoon]", "milk if needed",
+                                    title="test ganache", yield_line="MAKES ABOUT 1 CUP"),
+                         ["1 g black pepper [¼ teaspoon]", "milk if needed"])
 
 
 class NamesSubRecipeTest(unittest.TestCase):
