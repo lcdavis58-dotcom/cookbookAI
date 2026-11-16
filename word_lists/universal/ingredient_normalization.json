@@ -7,13 +7,13 @@
     "packed", "lightly", "firmly", "loosely", "heaping", "scant", "generous",
     "cold", "chilled", "softened", "melted",
     "very", "ripe", "overripe", "firm-ripe", "unsliced", "real", "pure",
-    "fresh", "freshly", "fresh-squeezed", "frozen", "strained", "full-fat",
+    "fresh", "freshly", "fresh-squeezed", "squeezed", "frozen", "strained", "full-fat",
     "finely", "coarsely", "roughly", "thinly", "thickly",
     "chopped", "minced", "diced", "sliced", "grated", "sifted", "mashed",
     "cubed", "torn", "peeled", "pitted",
     "ounce", "ounces", "oz", "pound", "pounds", "lb", "lbs",
     "teaspoon", "teaspoons", "tablespoon", "tablespoons", "cup", "cups",
-    "quart", "quarts", "pint", "pints",
+    "quart", "quarts", "pint", "pints", "gallon", "gallons",
     "envelope", "envelopes", "package", "packages", "tube", "tubes",
     "bunch", "bunches", "head", "heads", "sprig", "sprigs", "stalk", "stalks",
     "clove", "cloves", "sheet", "sheets", "can", "cans", "jar", "jars", "bag", "bags"
@@ -35,8 +35,14 @@
     "^to\\s+\\d+\\s*g\\s*/\\s*\\S+(?:\\s+\\w+)?\\s+to\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
     "^or\\s+\\d+\\s+",
     "^(?:one|two|three|\\d+)\\s+[\\d.]+-ounce\\s+(?:can|package|jar|bag)\\s+",
-    "^plus\\s+\\S+\\s+(?:cups?|tablespoons?|teaspoons?)\\s+",
+    "^plus\\s+(?:scant\\s+)?\\S+\\s+(?:cups?|tablespoons?|teaspoons?|ounces?)\\s+",
     "^to\\s+\\d+\\s+",
+    "^(?:to\\s+)?(?:small|medium|large)(?:-to-(?:small|medium|large))?(?:\\s+to\\s+(?:small|medium|large))?\\s+or\\s+(?:(?:[\\d/½¼¾]+|one|two|three)(?:\\s+or\\s+[\\d/½¼¾]+)?\\s+)?(?:small|medium|large)(?:-to-(?:small|medium|large))?(?:\\s+to\\s+(?:small|medium|large))?\\s+",
+    "^to\\s+(?:small|medium|large)\\s+",
+    "^to\\s+[\\d/.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
+    "^(?:liquid\\s+)?cups?\\s+plus\\s+",
+    "^(?:g|ml)\\s+(?:/\\s+[\\d½¼¾]+(?:\\s+to\\s+[\\d½¼¾]+)?\\s+)?",
+    "^(?:wide\\s+)?strips?\\s+(?=\\w+\\s+(?:zest|peel)\\b)",
     "^(?:juice|zest)\\s+of\\s+[\\d½¼¾]+\\s+",
     "^wide\\s+strips?\\s+",
     "^[\\d.½¼¾⅓⅔]+\\s+(?=(?:ounces?|pounds?|cups?|tablespoons?|teaspoons?)\\b)",
@@ -53,14 +59,17 @@
     "\\s+to\\s+[a-z]+\\s+the\\b.*$",
     "\\s+if\\s+needed$",
     "\\s+straight\\s+from\\s+the\\s+fridge$",
-    "\\s+from\\s+about\\s+\\d.*$",
-    "\\s+such\\s+as\\b.*$"
+    "\\s+from\\s+(?:about\\s+)?\\d.*$",
+    "\\s+such\\s+as\\b.*$",
+    "\\s+plus\\s+more\\b.*$",
+    "\\s*;?\\s+(?:or\\s+)?(?:more\\s+)?(?:to\\s+taste|as\\s+needed)$"
   ],
 
   "_comma_descriptors": "Words that describe an ingredient when printed alone before a comma, BraveTart style: 'cold, unsalted butter', 'whole, ripe strawberries', 'plump, moist, dried apples'. The word and its comma are dropped, so the cut at the first comma doesn't leave just 'cold'. Only words that are never the ingredient itself belong here.",
   "comma_descriptors": [
     "whole", "plump", "moist", "sticky", "unsweetened", "cold", "medium", "large",
-    "small", "ripe", "unpeeled", "soft", "firm", "fresh", "unseeded", "mature"
+    "small", "ripe", "unpeeled", "soft", "firm", "fresh", "unseeded", "mature",
+    "unbaked", "unpricked", "chilled"
   ],
 
   "_equivalents": "Whole normalized names that mean the same ingredient, written differently. Applied last, after plurals are removed.",
@@ -73,6 +82,7 @@
     "ice water": "water",
     "cool water": "water",
     "boiling water": "water",
+    "hot water": "water",
     "garlic clove": "garlic",
     "pink lady apple": "sweet-tart apple",
     "pink lady or any sweet-tart": "sweet-tart apple",

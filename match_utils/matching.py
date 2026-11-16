@@ -117,6 +117,7 @@ class Matcher:
 
     def __init__(self, have, staples=None, parts=None, not_varieties=None, index=None, kinds=None):
         parts = load_parts() if parts is None else parts
+        self.parts = parts
         self.not_varieties = load_not_varieties() if not_varieties is None else not_varieties
         self.have = list(have)
         self.covered = _with_parts(self.have, parts)
@@ -166,6 +167,10 @@ class Matcher:
                "from_scratch": [], "stand_ins": []}
         for requirement in entry["ingredients"]:
             self._check_requirement(requirement, out, stack + (rid,))
+        # Missing both "lemon" and "lemon juice": the lemon gives the
+        # juice, so it's one thing to get.
+        out["missing"] = [m for m in out["missing"]
+                          if not any(whole in out["missing"] and m in parts for whole, parts in self.parts.items())]
         self._made[rid] = out
         return out
 
