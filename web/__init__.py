@@ -19,7 +19,7 @@ from flask_wtf.csrf import CSRFError, CSRFProtect
 from werkzeug.routing import BaseConverter
 
 from chat.terminal import when
-from common.config import CHATS_DIR, USERS_PATH, WEB_SECRET_PATH
+from common.config import CHATS_DIR, FLAGS_DIR, USERS_PATH, WEB_SECRET_PATH
 from web import auth
 from web.answers import Answers, answer_chat
 from web.routes import CHAT_ID, bp
@@ -54,12 +54,13 @@ def secret_key(path):
 
 
 def create_app(chats_dir=CHATS_DIR, users_path=USERS_PATH, secret_path=WEB_SECRET_PATH,
-               https=False, config=None):
+               https=False, config=None, flags_dir=FLAGS_DIR):
     """https: the site is reached over HTTPS (through Cloudflare, say), so
     the login cookie must never be sent without it."""
     app = Flask(__name__)
     app.config.update(
         CHATS_DIR=chats_dir,
+        FLAGS_DIR=flags_dir,
         USERS_PATH=users_path,
         SECRET_KEY=secret_key(secret_path),
         MAX_CONTENT_LENGTH=MAX_REQUEST_BYTES,

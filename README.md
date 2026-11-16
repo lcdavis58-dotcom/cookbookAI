@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.0.1
+Version 1.1.0
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
@@ -42,7 +42,7 @@ Scaling 'Classic Whipped Cream' (Full Batch) from The Book On Pie... 2.0x
 > how long does it chill?
 ```
 
-Every message is saved as it's sent (in `chats/`), so a chat can be picked up later: `python3 chat.py` offers to continue the latest one and to answer a message that never got a reply. `--new` starts a new chat, `--list` lists them, `--open N` opens one; in a chat, `/help` lists the commands. Plain rules handle the common follow-ups; anything else goes to the chat model, and when it's unclear what you mean, it asks.
+Every message is saved as it's sent (in `chats/`), so a chat can be picked up later: `python3 chat.py` offers to continue the latest one and to answer a message that never got a reply. `--new` starts a new chat, `--list` lists them, `--open N` opens one; in a chat, `/help` lists the commands, and `/flag` marks the last reply as wrong (see Flagged replies below). Plain rules handle the common follow-ups; anything else goes to the chat model, and when it's unclear what you mean, it asks.
 
 In a chat, "what pumpkin pie recipes do I have" lists every recipe with those words in its title, by book, and a general name like "pie crust" lists every recipe of that kind, whatever the book calls it.
 
@@ -79,9 +79,23 @@ python3 serve.py                   # http://127.0.0.1:8000, this computer only
 python3 serve.py --lan             # also reachable from your home network
 ```
 
+Under each reply is a small grey flag: tap it to say the reply was wrong, with an optional note on what was wrong. A flagged reply's flag turns red (tap it again to take the flag back), and green once the problem is fixed.
+
 There's no sign-up page: `tools/add_user.py` also has `--list` and `--remove NAME`. Changing a password signs that account out everywhere. Each account's chats are in `chats/users/<name>/`, separate from the command line's in `chats/`.
 
 **Reaching it from outside your home:** don't forward a router port to it. Use something that gates access first; [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) with an Access email allowlist works, and connects outward from your machine. Run `python3 serve.py --https`, without `--lan`, which also stops the login cookie being sent without HTTPS. Note that your chats and recipe text then pass through Cloudflare.
+
+## Flagged replies
+
+Replies flagged as wrong, on the website or with `/flag`, are saved in `flags/`, one file each, apart from the chats. Each one keeps everything needed to understand it, even after its chat is deleted: the whole chat up to the flagged reply, the note, what the chat was focused on, how each message was routed and how long the model took, the version, the model, and when the recipe index was built.
+
+```
+python3 tools/flagged.py                               # write the summaries, print how many are open
+python3 tools/flagged.py handled ID "what covers it"   # a version or a test, e.g. "1.1.2"
+python3 tools/flagged.py reopen ID                     # undo a mistaken "handled"
+```
+
+Each run rewrites `flags/open_flags.md` (still to fix) and `flags/handled_flags.md`, so they can be read without running it again. Marking a flag handled turns its flag green on the website. Like the chats, flags quote the books, so they stay out of the repository.
 
 ## Setup
 
@@ -98,13 +112,14 @@ CookbookAI/
 ├── app/          <- this repository
 ├── chroma_db/    <- created by ingest.py
 ├── chats/        <- saved chats, one file each (CHATS_DIR overrides it)
+├── flags/        <- replies flagged as wrong, and their summaries (FLAGS_DIR)
 ├── extracted/    <- saved PDF extractions, created by ingest.py
 ├── users.json    <- website accounts, password hashes only (USERS_PATH)
 ├── web_secret.key <- signs website logins, created on first run (WEB_SECRET_PATH)
 └── cookbooks/    <- your PDFs (not included)
 ```
 
-Book titles and PDF filenames are in `BOOK_FILES` in `common/config.py`, and the books to ingest in `INGEST_BOOKS` in `ingest.py`. To keep the PDFs somewhere else, set the `COOKBOOKS_DIR` environment variable. `COOKBOOK_DATA_DIR` moves everything the app writes (`chroma_db/`, `recipe_index.json`, `chats/`, `extracted/`) to another folder; keep it out of a synced folder like OneDrive or Dropbox, which would keep re-uploading a live database. `EXTRACT_DIR` and `CHATS_DIR` move just those. Then:
+Book titles and PDF filenames are in `BOOK_FILES` in `common/config.py`, and the books to ingest in `INGEST_BOOKS` in `ingest.py`. To keep the PDFs somewhere else, set the `COOKBOOKS_DIR` environment variable. `COOKBOOK_DATA_DIR` moves everything the app writes (`chroma_db/`, `recipe_index.json`, `chats/`, `flags/`, `extracted/`) to another folder; keep it out of a synced folder like OneDrive or Dropbox, which would keep re-uploading a live database. `EXTRACT_DIR`, `CHATS_DIR` and `FLAGS_DIR` move just those. Then:
 
 ```
 python3 ingest.py               # build or update the database
@@ -132,7 +147,7 @@ Every chat reply saves how long each model call took, and `tools/diagnostics/mod
 |---|---|
 | `ingest.py`, `ingest_utils/` | PDF → lines with layout (saved) → recipe-aware chunks → Chroma |
 | `actions/` | What `query.py`, `scale.py` and `match.py` do, each returning its result as data plus the text the command line prints; the scripts are thin wrappers |
-| `chat.py`, `chat/` | The chat: the terminal loop, routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, and saving it to `chats/` |
+| `chat.py`, `chat/` | The chat: the terminal loop, routing each message to an action (rules first, then the model), what a chat remembers (the recipe it's on, the last numbered list, a question waiting for an answer), its reply wording, saving it to `chats/`, and replies flagged as wrong (`flags/`) |
 | `serve.py`, `web/` | The website: sign-in, the chat pages, replies worked out in the background |
 | `query.py`, `query_utils/` | Retrieval, split-recipe reassembly, title lookup over the recipe index |
 | `scale.py`, `scale_utils/` | Ingredient parsing, scale factors, measurement display |
@@ -162,8 +177,6 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.0.1:** more unit tests and a higher coverage floor in CI (`scale_utils/pan_scaling.py`, `books/line_styles.py`, `match_utils/recipe_index.py`, the command-line scripts), local tests that need the PDFs, database and model (`testing/local/`), and a pre-push hook
-- **1.1.0:** flag a reply as wrong on the website, with an optional note on what was wrong, and list every flagged reply for planning fixes and tests
 - **1.1.1:** clean up oddly read ingredient names (like "flour for rolling" counted as missing), link the remaining sub-recipes, ingredient parser fixes
 - **1.1.2:** understand what's asked for: stop reading some sentences as ingredient lists ("..., show me the one from dessert person") or "half and half" as halving, scale to a number of people from the servings you say the recipe makes ("it usually feeds 5"), scale by a count you have ("I only have 1 egg") when the recipe also gives that ingredient's weight, read "half again as much" and "scale that by 3", stop scaling a pie crust or a pinch of salt to "~1.12 whole", and word scaling refusals plainly
 - **1.1.3:** find the right recipe: "butter cream" finds Buttercream, say when a recipe was found through its variation, show a recipe named in part ("the extra-thick one"), answer a question that names a recipe instead of showing it, see results past the first 15, and better ordering when results tie

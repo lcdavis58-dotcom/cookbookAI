@@ -13,6 +13,8 @@
   --on-accent: #ffffff;
   --mine: #f3e3d3;
   --alert: #a12a1f;
+  --flagged: #c62f22;
+  --fixed: #2f7d3a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,6 +28,8 @@
     --on-accent: #241a12;
     --mine: #3b2d22;
     --alert: #f0968a;
+    --flagged: #ff7a6b;
+    --fixed: #7fcf8a;
   }
 }
 
@@ -253,6 +257,91 @@ small {
   border-radius: 0.75rem;
 }
 
+/* The flag under each reply (_flag.html). One icon, drawn in
+   currentColor, so each state only changes the color: grey and
+   see-through until it's used, then red, then green once it's fixed. */
+.reply-flag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin-top: 0.125rem;
+}
+
+.flag summary,
+button.flag,
+span.flag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 0.5rem;
+}
+
+.flag summary {
+  opacity: 0.45;
+  cursor: pointer;
+  list-style: none;
+}
+
+.flag summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Fully there while pointed at, tabbed to, or open. */
+.flag summary:hover,
+.flag summary:focus-visible,
+.flag[open] summary {
+  opacity: 1;
+  background: var(--panel);
+}
+
+/* Flagged and fixed: a solid flag, filled in its color. */
+button.flag.flagged {
+  color: var(--flagged);
+}
+
+span.flag.handled {
+  color: var(--fixed);
+}
+
+button.flag.flagged .cloth,
+span.flag.handled .cloth {
+  fill: currentColor;
+}
+
+button.flag.flagged:hover {
+  background: var(--panel);
+}
+
+/* Opening the note box gives it the whole row. */
+.reply-flag details[open] {
+  flex-basis: 100%;
+}
+
+.flag-panel {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  max-width: 32rem;
+  margin-top: 0.25rem;
+}
+
+.flag-panel textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+}
+
+.flag-note {
+  overflow-wrap: anywhere;
+}
+
 #status {
   margin-bottom: 1rem;
   color: var(--muted);
@@ -353,6 +442,8 @@ textarea {
 }
 
 #composer textarea:focus,
+.flag-panel textarea:focus,
+summary:focus-visible,
 input:focus,
 button:focus-visible,
 a:focus-visible {

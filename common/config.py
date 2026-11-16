@@ -27,6 +27,10 @@ EXTRACT_DIR = os.environ.get("EXTRACT_DIR", os.path.join(DATA_DIR, "extracted"))
 # Saved chats (chat/store.py), one file each, in a folder of their own
 # so nothing else ends up mixed in with them. CHATS_DIR overrides it.
 CHATS_DIR = os.environ.get("CHATS_DIR", os.path.join(DATA_DIR, "chats"))
+# Replies flagged as wrong (chat/flags.py), one file each, plus the
+# summaries tools/flagged.py writes. They copy chats, which quote the
+# books, so they stay outside app/. FLAGS_DIR overrides it.
+FLAGS_DIR = os.environ.get("FLAGS_DIR", os.path.join(DATA_DIR, "flags"))
 # The website's accounts (common/accounts.py) and the key that signs its
 # login cookies (web/__init__.py). Both stay outside app/, never committed.
 USERS_PATH = os.environ.get("USERS_PATH", os.path.join(DATA_DIR, "users.json"))

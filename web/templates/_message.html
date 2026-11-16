@@ -1,4 +1,5 @@
 <article id="m{{ number }}" class="message {{ message.role }}">
   <strong>{{ "You" if message.role == "user" else "Assistant" }}</strong>
   <pre>{{ message.text }}</pre>
+  {% if message.role == "assistant" and chat %}{% include "_flag.html" %}{% endif %}
 </article>

@@ -1,0 +1,39 @@
+{# The flag under a reply, for saying it was wrong (chat/flags.py). flag
+   is the reply's flag, if it has one:
+     none       grey and see-through; tapping it opens a box for a note
+     open       red; tapping it takes the flag back, after asking
+     handled    green, and only a picture: it was fixed, so nothing to tap
+   Each change redraws the whole message (_message.html). #}
+{% set icon %}
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path class="cloth" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+  <path d="M4 22v-7"/>
+</svg>
+{% endset %}
+<div class="reply-flag">
+{% if not flag %}
+  <details class="flag">
+    <summary aria-label="Flag this reply as wrong" title="Flag this reply as wrong">{{ icon }}</summary>
+    <form class="flag-panel"
+          hx-post="{{ url_for('chats.flag', chat_id=chat.id, number=number) }}"
+          hx-target="closest article"
+          hx-swap="outerHTML">
+      <textarea name="note" rows="2" maxlength="{{ max_note_chars }}"
+                placeholder="What was wrong? (optional)" aria-label="What was wrong? (optional)"></textarea>
+      <button type="submit" class="tap">Flag it</button>
+    </form>
+  </details>
+{% elif flag.status == "open" %}
+  <button type="button" class="flag flagged"
+          aria-label="Flagged as wrong. Remove this flag"
+          title="Remove this flag"
+          hx-post="{{ url_for('chats.unflag', chat_id=chat.id, number=number) }}"
+          hx-target="closest article"
+          hx-swap="outerHTML"
+          hx-confirm="Remove this flag?">{{ icon }}</button>
+  {% if flag.note %}<small class="flag-note">{{ flag.note }}</small>{% endif %}
+{% else %}
+  <span class="flag handled" role="img" aria-label="Fixed" title="Fixed">{{ icon }}</span>
+{% endif %}
+</div>

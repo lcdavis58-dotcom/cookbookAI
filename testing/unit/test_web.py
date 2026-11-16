@@ -18,7 +18,7 @@ from unittest import mock
 
 from testing.unit.test_chat_router import CANDIDATES  # (also stubs chromadb/ollama)
 
-from chat import store  # noqa: E402
+from chat import flags, store  # noqa: E402
 from chat.state import ChatState, Numbered, Pending, RecipeRef  # noqa: E402
 from common import accounts, models  # noqa: E402
 from common.config import MODEL_TIMEOUT  # noqa: E402
@@ -39,12 +39,13 @@ class WebCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root)
         self.chats = os.path.join(self.root, "chats")
         self.users = os.path.join(self.root, "users.json")
+        self.flags = os.path.join(self.root, "flags")
         patcher = mock.patch("web.routes.load_candidates", return_value=CANDIDATES)
         patcher.start()
         self.addCleanup(patcher.stop)
         accounts.set_password("levi", PASSWORD, self.users)
         self.app = create_app(self.chats, self.users, os.path.join(self.root, "secret.key"),
-                              https=self.https, config=self.config)
+                              https=self.https, config=self.config, flags_dir=self.flags)
         self.client = self.app.test_client()
 
     def sign_in(self, client=None, name="levi", password=PASSWORD):
@@ -517,6 +518,121 @@ class ManagingChatsTest(WebCase):
     def test_changes_need_post(self):
         chat = self.saved_chat()
         self.assertEqual(self.client.get(f"/chats/{chat.id}/delete").status_code, 405)
+
+
+class FlaggingTest(WebCase):
+    def setUp(self):
+        super().setUp()
+        self.sign_in()
+        self.dir = self.user_dir()
+        self.answers = self.app.extensions["answers"]
+        self.release = threading.Event()
+        self.answers.work = lambda *_: self.release.wait(5)
+
+    def flag(self, chat, number=2, note="", client=None):
+        return (client or self.client).post(f"/chats/{chat.id}/messages/{number}/flag", data={"note": note})
+
+    def unflag(self, chat, number=2, client=None):
+        return (client or self.client).post(f"/chats/{chat.id}/messages/{number}/unflag")
+
+    def article(self, page, number):
+        return re.search(rf'<article id="m{number}".*?</article>', page, re.S).group(0)
+
+    def test_every_reply_has_a_grey_flag_and_her_messages_none(self):
+        chat = self.saved_chat()
+        page = self.page(f"/chats/{chat.id}")
+        reply = self.article(page, 2)
+        self.assertIn('<details class="flag">', reply)
+        self.assertIn(f'hx-post="/chats/{chat.id}/messages/2/flag"', reply)
+        self.assertIn(f'maxlength="{flags.MAX_NOTE_CHARS}"', reply)
+        self.assertNotIn('class="flag', self.article(page, 1))
+
+    def test_flag_with_a_note_turns_it_red(self):
+        chat = self.saved_chat()
+        response = self.flag(chat, note="  it tripled it  ")
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        self.assertTrue(body.startswith('<article id="m2"'))
+        self.assertIn('class="flag flagged"', body)
+        self.assertIn(f'hx-post="/chats/{chat.id}/messages/2/unflag"', body)
+        self.assertIn('hx-confirm="Remove this flag?"', body)
+        self.assertIn("it tripled it", body)
+        [f] = flags.all_flags(self.flags)[0]
+        self.assertEqual((f.account, f.chat_id, f.message, f.note), ("levi", chat.id, 2, "it tripled it"))
+        self.assertIn('class="flag flagged"', self.article(self.page(f"/chats/{chat.id}"), 2))
+
+    def test_the_note_is_escaped(self):
+        chat = self.saved_chat()
+        body = self.flag(chat, note='"><script>alert(1)</script>').get_data(as_text=True)
+        self.assertNotIn("<script>alert", body)
+
+    def test_flagging_does_not_change_the_chat_file(self):
+        chat = self.saved_chat()
+        path = os.path.join(self.dir, f"{chat.id}.json")
+        with open(path, encoding="utf-8") as f:
+            before = f.read()
+        self.flag(chat)
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), before)
+
+    def test_unflag_turns_it_grey_again(self):
+        chat = self.saved_chat()
+        self.flag(chat)
+        body = self.unflag(chat).get_data(as_text=True)
+        self.assertIn('<details class="flag">', body)
+        self.assertEqual(flags.all_flags(self.flags), ([], []))
+
+    def test_a_handled_flag_is_green_and_cannot_be_tapped(self):
+        chat = self.saved_chat()
+        self.flag(chat)
+        [f] = flags.all_flags(self.flags)[0]
+        flags.mark_handled(f.id, "1.1.2", self.flags)
+        reply = self.article(self.page(f"/chats/{chat.id}"), 2)
+        self.assertIn('<span class="flag handled" role="img" aria-label="Fixed"', reply)
+        self.assertNotIn("hx-post", reply)
+        self.assertNotIn("1.1.2", reply)
+        self.assertEqual(self.unflag(chat).status_code, 400)
+        self.assertEqual(flags.load(f.id, self.flags).status, flags.HANDLED)
+
+    def test_only_replies_that_exist_can_be_flagged(self):
+        chat = self.saved_chat()
+        for number in (0, 1, 3):
+            self.assertEqual(self.flag(chat, number).status_code, 404)
+            self.assertEqual(self.unflag(chat, number).status_code, 404)
+        self.assertEqual(flags.all_flags(self.flags), ([], []))
+
+    def test_a_note_too_long_is_refused(self):
+        chat = self.saved_chat()
+        self.assertEqual(self.flag(chat, note="x" * (flags.MAX_NOTE_CHARS + 1)).status_code, 400)
+        self.assertEqual(self.flag(chat, note="x" * flags.MAX_NOTE_CHARS).status_code, 200)
+
+    def test_flagging_works_while_a_reply_is_worked_on(self):
+        chat = self.saved_chat()
+        chat.add_user("and now?")
+        store.save(chat, self.dir)
+        self.addCleanup(self.answers.join)
+        self.addCleanup(self.release.set)
+        self.client.post(f"/chats/{chat.id}/answer")
+        self.assertEqual(self.flag(chat).status_code, 200)
+
+    def test_another_account_cannot_flag_or_unflag(self):
+        accounts.set_password("tester", PASSWORD, self.users)
+        hers = self.saved_chat()
+        self.flag(hers)
+        other = self.app.test_client()
+        self.sign_in(other, "tester")
+        self.assertEqual(self.flag(hers, client=other).status_code, 404)
+        self.assertEqual(self.unflag(hers, client=other).status_code, 404)
+        self.assertEqual(len(flags.all_flags(self.flags)[0]), 1)
+
+    def test_a_delivered_reply_has_a_flag(self):
+        chat = self.saved_chat()
+        body = self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True)
+        self.assertIn('<details class="flag">', body)
+
+    def test_flags_need_post(self):
+        chat = self.saved_chat()
+        self.assertEqual(self.client.get(f"/chats/{chat.id}/messages/2/flag").status_code, 405)
 
 
 class HalfAndHalfTest(unittest.TestCase):

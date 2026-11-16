@@ -12,4 +12,6 @@ matching, and follow up on what was said before.
                      updates it
     chat/reply.py    the chat's wording of each result
     chat/store.py    saving chats to CHATS_DIR and loading them again
+    chat/flags.py    replies flagged as wrong, kept apart from the chats in
+                     FLAGS_DIR, and the summaries tools/flagged.py writes
 """
