@@ -72,7 +72,7 @@
   <div id="messages">
     {% if chat %}
       {% for message in chat.messages %}
-        {% with number = loop.index %}{% include "_message.html" %}{% endwith %}
+        {% with number = loop.index, flag = flagged.get(loop.index) %}{% include "_message.html" %}{% endwith %}
       {% endfor %}
       {% include "_status.html" %}
     {% else %}

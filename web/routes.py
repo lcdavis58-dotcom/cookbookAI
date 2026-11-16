@@ -9,7 +9,8 @@ conversation is what those requests replace.
 
 Only the worker saves a chat while it's answering, so viewing never
 saves, and a new message, a rename or a delete is refused until the
-reply is done.
+reply is done. Flagging a reply as wrong doesn't touch the chat's file
+(chat/flags.py keeps flags apart), so it works at any time.
 """
 
 import os
@@ -19,7 +20,7 @@ from flask import (Blueprint, abort, current_app, make_response, redirect, rende
                    url_for)
 from flask_login import current_user, login_required
 
-from chat import store
+from chat import flags, store
 from chat.router import load_candidates
 from chat.state import ChatState, refresh
 
@@ -40,7 +41,8 @@ def require_login():
 
 @bp.context_processor
 def limits():
-    return {"max_message_chars": MAX_MESSAGE_CHARS, "max_title_chars": MAX_TITLE_CHARS}
+    return {"max_message_chars": MAX_MESSAGE_CHARS, "max_title_chars": MAX_TITLE_CHARS,
+            "max_note_chars": flags.MAX_NOTE_CHARS}
 
 
 def chats_dir():
@@ -50,6 +52,10 @@ def chats_dir():
     if os.path.dirname(folder) != users:
         abort(404)
     return folder
+
+
+def flags_dir():
+    return current_app.config["FLAGS_DIR"]
 
 
 def answers():
@@ -157,7 +163,9 @@ def show(chat_id):
     # An empty index means it's missing, not that every recipe is gone.
     gone = refresh(chat, candidates) if candidates else []
     chats, broken = chat_list()
-    return render_template("chat.html", chats=chats, broken=broken, chat=chat, gone=gone, status=status)
+    flagged = flags.for_chat(current_user.name, chat_id, flags_dir())
+    return render_template("chat.html", chats=chats, broken=broken, chat=chat, gone=gone, status=status,
+                           flagged=flagged)
 
 
 @bp.post("/chats/<chat_id:chat_id>/messages")
@@ -225,6 +233,43 @@ def answer(chat_id):
     if load_chat(chat_id).unanswered() is not None:
         answers().submit(chats_dir(), chat_id)
     return status_response(chat_id, deliver_reply=True)
+
+
+def reply_number(chat, number):
+    """404 unless message number (counting from 1) is one of the chat's replies."""
+    if not 1 <= number <= len(chat.messages) or chat.messages[number - 1].role != "assistant":
+        abort(404)
+
+
+def flagged_message(chat, number):
+    """The reply, drawn again with its flag as it is now."""
+    return render_template("_message.html", chat=chat, message=chat.messages[number - 1], number=number,
+                           flag=flags.find(current_user.name, chat.id, number, flags_dir()))
+
+
+@bp.post("/chats/<chat_id:chat_id>/messages/<int:number>/flag")
+def flag(chat_id, number):
+    """Flag a reply as wrong, with an optional note on what was wrong."""
+    note = request.form.get("note", "").strip()
+    if len(note) > flags.MAX_NOTE_CHARS:
+        abort(400)
+    chat = load_chat(chat_id)
+    reply_number(chat, number)
+    flags.flag(chat, number, current_user.name, note, flags_dir())
+    return flagged_message(chat, number)
+
+
+@bp.post("/chats/<chat_id:chat_id>/messages/<int:number>/unflag")
+def unflag(chat_id, number):
+    """Take a flag back. A handled one stays: the page has no button for
+    it, so only a hand-made request gets here."""
+    chat = load_chat(chat_id)
+    reply_number(chat, number)
+    try:
+        flags.unflag(current_user.name, chat_id, number, flags_dir())
+    except flags.FlagError:
+        abort(400)
+    return flagged_message(chat, number)
 
 
 @bp.get("/chats/<chat_id:chat_id>/status")
