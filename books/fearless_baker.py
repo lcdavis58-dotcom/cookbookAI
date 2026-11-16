@@ -19,6 +19,16 @@ import re
 
 TITLE_MIN_SIZE = 27
 YIELD_RE = re.compile(r"^Makes\b")
+# Sauces printed after the recipe that uses them have no yield line
+# ("Salted Caramel Sauce" / "298 g / 1½ cups granulated sugar").
+TITLE_THEN_INGREDIENTS = True
+# Names other recipes use for one: "1 recipe Brioche Dough, cold" is the
+# dough of Brioche Rolls ("Every baker should have a good brioche
+# recipe..."), and Diplomat Cream is among Pastry Cream's variations.
+TITLE_ALIASES = {
+    "Brioche Rolls": ["Brioche Dough"],
+    "Pastry Cream": ["Diplomat Cream"],
+}
 # The yield block runs on through the difficulty line and the make-ahead
 # paragraph; its wrapped lines are taken by the shared rules (lowercase
 # starts, lines left hanging).

@@ -23,6 +23,9 @@ import re
 TITLE_MIN_SIZE = 21
 # "Season:" follows every recipe title (after the subtitle, if any).
 YIELD_RE = re.compile(r"^Season:", re.IGNORECASE)
+# Focaccia's optional toppings have no yield line ("Garlic and Rosemary
+# Focaccia Topping" / "¼ cup extra-virgin olive oil").
+TITLE_THEN_INGREDIENTS = True
 INGREDIENT_STYLE = "volume_paren_metric"
 
 # Every instruction step opens with a short bolded heading and a colon
@@ -54,4 +57,5 @@ def ingredient_start(lines):
     for i, line in enumerate(lines[:8]):
         if _DIFFICULTY_RE.search(line):
             return i + 1
-    return 0
+    # A focaccia topping has neither: its list starts under the title.
+    return 1 if lines else 0

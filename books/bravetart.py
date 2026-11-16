@@ -45,6 +45,13 @@ YIELD_RE = re.compile(r"^YIELD:")
 HEADER_FIELD_RE = re.compile(r"\b(?:TIME|DOWNTIME):")
 INGREDIENTS_RIGHT_AFTER = True
 parse_ingredient_line = volume_pipe_weight
+# The PDF spaces one title's letters apart ("Roas ted Sugar"). Fluffy Cocoa
+# Nougat is the Milky Way® bars' nougat, and its HOMEMADE SNICKERS® NOUGAT
+# variation the Snickers® bars'.
+TITLE_ALIASES = {
+    "Roas ted Sugar": ["Roasted Sugar"],
+    "Fluffy Cocoa Nougat": ["Homemade Milky Way® Nougat", "Homemade Snickers® Nougat"],
+}
 
 # No numbered steps in this book; ingredient_end finds where the list
 # stops instead, so STEP_RE never matches.

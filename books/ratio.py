@@ -24,6 +24,9 @@ import re
 TITLE_MIN_SIZE = 16.9
 TITLE_ITALIC = True
 YIELD_RE = re.compile(r"^(?:YIELD|SERVES|MAKES)\b")
+# A few recipes have no yield line ("Basic Brine" / "20 ounces water
+# (2½ cups)").
+TITLE_THEN_INGREDIENTS = True
 INGREDIENT_STYLE = "volume_paren_metric"
 STEP_RE = re.compile(r"(?!)")
 

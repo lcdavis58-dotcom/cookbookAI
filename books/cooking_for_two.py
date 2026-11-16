@@ -27,6 +27,9 @@ TITLE_MIN_SIZE = 21
 # Bold only: 21.2 regular is never a title, but keep the rule strict.
 TITLE_BOLD = True
 YIELD_RE = re.compile(r"^(?:SERVES|MAKES)\b")
+# The omelet fillings have no yield line ("Mushroom and Thyme Filling" /
+# "1 tablespoon unsalted butter").
+TITLE_THEN_INGREDIENTS = True
 INGREDIENT_STYLE = "volume_paren_metric"
 # The test kitchen's sidebar after a recipe, which can hold amounts of its
 # own ("NOTES FROM THE TEST KITCHEN", "SECRETS TO FOOLPROOF WHIPPED CREAM").
