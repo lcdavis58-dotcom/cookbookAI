@@ -52,7 +52,7 @@ In a chat, "what pumpkin pie recipes do I have" lists every recipe with those wo
 python3 query.py "What page has the recipe for sweet tart dough?"
 ```
 
-**Scale a recipe** (`scale.py`): by a multiplier, to a target yield, to a pan size, or to fit an ingredient you're short on. Amounts are converted to measuring tools you actually own, and ingredients that shouldn't scale linearly are flagged. A yield you state ("it usually feeds 5") is used over the recipe's own, and an amount you have is compared in its own unit (1 egg against the eggs, not their grams). Things that only come whole (`ingredient_rules/whole_items.json`) are rounded to whole cans, jars or pinches, and a crust isn't scaled at all, with a note that more or less filling usually means a different pan.
+**Scale a recipe** (`scale.py`): by a multiplier, to a target yield, to a pan size, or to fit an ingredient you're short on. Amounts are converted to measuring tools you actually own, and ingredients that shouldn't scale linearly are flagged. A yield you state ("it usually feeds 5", "feeds five") is used over the recipe's own, and an amount you have is compared in its own unit (1 egg against the eggs, not their grams). A line naming two ingredients ("3 large eggs plus 1 large egg yolk", "lemon zest plus 1 teaspoon juice") scales both. Things that only come whole (`ingredient_rules/whole_items.json`) are rounded to whole eggs, cans, jars or pinches, with the exact amount in a note, and a crust isn't scaled at all, with a note that more or less filling usually means a different pan.
 
 ```
 python3 scale.py "please double the classic whipped cream recipe"

@@ -67,10 +67,12 @@ _COUNT_EXCEPT = ("cup", "tablespoon", "teaspoon", "tbsp", "tsp", "oz", "ounce", 
 def whole_item(ing):
     """For a counted ingredient that only comes whole
     (ingredient_rules/whole_items.json): ("not_scaled", note) for a crust,
-    ("whole", None) for a can, ("rough", None) for a pinch; None for anything else,
-    including anything weighed or measured."""
+    ("whole", None) for a can, ("exact", None) for an egg (always noted),
+    ("rough", None) for a pinch; None for anything else, including
+    anything measured by volume. A line with a weight too ("100 g / 2
+    large eggs") rounds only its count; a crust with a weight is scaled."""
     unit = (ing.get("imperial_unit") or "").lower()
-    if ing.get("metric_amount") or not ing.get("imperial_amount") or any(u in unit for u in _COUNT_EXCEPT):
+    if not ing.get("imperial_amount") or any(u in unit for u in _COUNT_EXCEPT):
         return None
     try:
         with open(WHOLE_ITEMS_PATH) as f:
@@ -80,10 +82,12 @@ def whole_item(ing):
         return None
     text = f"{unit} {ing['name'].lower().split(',', 1)[0]}"
     not_scaled = rules.get("not_scaled", {})
-    if any(_keyword_matches(k, text) for k in not_scaled.get("keywords", [])):
+    if not ing.get("metric_amount") and any(_keyword_matches(k, text) for k in not_scaled.get("keywords", [])):
         return "not_scaled", not_scaled.get("note", "Not scaled.")
     if any(_keyword_matches(k, text) for k in rules.get("whole_units", [])):
         return "whole", None
+    if any(_keyword_matches(k, text) for k in rules.get("always_noted_units", [])):
+        return "exact", None
     if any(_keyword_matches(k, text) for k in rules.get("rough_units", [])):
         return "rough", None
     return None

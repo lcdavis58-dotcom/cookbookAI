@@ -278,10 +278,34 @@ _NOT_A_COUNT_RE = re.compile(rf"\s*(?:-\s*)?(?:(?:{_MEASURE_UNIT}|inch(?:es)?|cm
 _COUNT_CANDIDATE_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])")
 
 
+_NUMBER_WORDS = {w: i for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+    "seventeen eighteen nineteen twenty".split())}
+_NUMBER_WORD_RE = re.compile(r"\b(" + "|".join(_NUMBER_WORDS) + r")\b", re.IGNORECASE)
+# "this one", "the one from ...": not a number.
+_BEFORE_A_PRONOUN_ONE_RE = re.compile(r"\b(?:this|that|the|which|each|another|a|any|every|other)\s+$", re.IGNORECASE)
+
+
+def with_digits(text):
+    """Number words as digits, so "it feeds five, make it for eight" reads
+    like "it feeds 5, make it for 8"; "a dozen" is 12 ("3 dozen" is left
+    for the model). "this one" isn't a number."""
+    text = re.sub(r"\ba\s+dozen\b", "12", text or "", flags=re.IGNORECASE)
+
+    def digit(m):
+        word = m.group(1).lower()
+        if word == "one" and _BEFORE_A_PRONOUN_ONE_RE.search(text[:m.start()]):
+            return m.group(0)
+        return str(_NUMBER_WORDS[word])
+    return _NUMBER_WORD_RE.sub(digit, text)
+
+
 def count_numbers(question):
     """The numbers in a request that count something (people, servings,
     pieces): 5 and 8 in "this usually feeds 5 people, make it feed 8",
-    but not 9 in "a 9-inch pan" or 200 in "200 g"."""
+    but not 9 in "a 9-inch pan" or 200 in "200 g". Number words count
+    too (with_digits)."""
+    question = with_digits(question)
     return [float(m.group(1)) for m in _COUNT_CANDIDATE_RE.finditer(question or "")
             if not _NOT_A_COUNT_RE.match(question[m.end():])]
 
@@ -303,7 +327,8 @@ def detect_stated_yield(question):
     without the model: the model tends to take the recipe's yield line
     over her number. None unless the request has exactly two counts and
     says which one is the recipe's; anything else goes to the model."""
-    originals = [float(m.group(1)) for m in _ORIGINAL_YIELD_RE.finditer(question or "")]
+    question = with_digits(question)
+    originals = [float(m.group(1)) for m in _ORIGINAL_YIELD_RE.finditer(question)]
     counts = count_numbers(question)
     if len(originals) != 1 or len(counts) != 2 or originals[0] not in counts or _NOT_A_TOTAL_RE.search(question):
         return None
@@ -420,7 +445,7 @@ def resolve_scale_factor(intent, ingredients, yield_line="", question=""):
     if basis == "yield":
         target = intent.get("target_yield")
         original = intent.get("original_yield")
-        stated = {float(n) for n in _NUMBER_RE.findall(question or "")}
+        stated = {float(n) for n in _NUMBER_RE.findall(with_digits(question))}
         # She gave both numbers ("it feeds 5, make it feed 8") but the
         # model took the original from the yield line ("SERVES 8", so
         # 8 -> 8): use hers.
@@ -534,6 +559,7 @@ def scale_ingredients(ingredients, factor):
             "scaled_imperial_rounded": rounded_whole,
             "qualifier": ing.get("qualifier"),
             "unmeasured": ing.get("unmeasured", False),
+            "plus": ing.get("plus", False),
             "flags": flags,
         })
     return scaled
@@ -552,7 +578,8 @@ def _whole(ing, scaled_imperial, factor, flags):
         flags.append(("non_scalable", note))
         return ing["imperial_amount"], False
     whole = max(1, math.floor(scaled_imperial + 0.5))
-    if what == "whole" and abs(whole - scaled_imperial) > 0.1 * scaled_imperial:
+    off = abs(whole - scaled_imperial)
+    if (what == "whole" and off > 0.1 * scaled_imperial) or (what == "exact" and off > 0.005):
         exact = f"{scaled_imperial:.2f}".rstrip("0").rstrip(".")
         flags.append(("rounded", f"Rounded up to {whole}; the exact amount is {exact}, so use part of the last one "
                                  f"if it matters." if whole > scaled_imperial else

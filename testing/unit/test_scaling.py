@@ -19,9 +19,11 @@ for _name in ("chromadb", "ollama"):
         sys.modules[_name] = types.ModuleType(_name)
 
 from actions.scale import scaled_ingredient_lines  # noqa: E402
+from books import profile_for, strategy_for  # noqa: E402
 from books.line_styles import metric_slash  # noqa: E402
+from scale_utils.ingredients import split_plus  # noqa: E402
 from scale_utils.recipe_scaling import (count_numbers, detect_direct_multiplier, detect_stated_yield,  # noqa: E402
-                                        resolve_scale_factor, scale_ingredients, stated_unit)
+                                        resolve_scale_factor, scale_ingredients, stated_unit, with_digits)
 
 
 def constraint(name, amount):
@@ -59,8 +61,17 @@ class StatedYieldTest(unittest.TestCase):
             with self.subTest(request=request):
                 self.assertEqual(detect_stated_yield(request), expected)
 
+    def test_number_words(self):
+        for request, expected in (("it feeds five, make it for eight", (5, 8)),
+                                  ("this usually serves six but I need twelve", (6, 12)),
+                                  ("it makes a dozen, I need 18", (12, 18)),
+                                  ("make this one for 10, it serves 4", (4, 10))):
+            with self.subTest(request=request):
+                self.assertEqual(detect_stated_yield(request), expected)
+        self.assertEqual(with_digits("show me the one from dessert person"), "show me the one from dessert person")
+
     def test_left_to_the_model(self):
-        for request in ("make it for 12 people", "it makes 24, I need 3 dozen", "it serves 4, 4 more are coming",
+        for request in ("it makes 2 dozen, I need three dozen", "make it for 12 people", "it makes 24, I need 3 dozen", "it serves 4, 4 more are coming",
                         "it makes 2 batches, I want 3 batches"):
             with self.subTest(request=request):
                 self.assertIsNone(detect_stated_yield(request))
@@ -130,9 +141,68 @@ class WholeItemsTest(unittest.TestCase):
         self.assertEqual((salt["scaled_imperial"], salt["flags"]), (2, []))
         self.assertIn("salt: 1 pinch  ->  ~2 pinches", scaled_ingredient_lines(salt)[0])
 
+    def test_eggs_round_with_the_exact_amount_noted(self):
+        for factor, expected, note in ((1.125, 3, "Rounded down to 3; the exact amount is 3.38."),
+                                       (1.5, 5, "Rounded up to 5; the exact amount is 4.5,"), (2, 6, None)):
+            with self.subTest(factor=factor):
+                eggs = self.scaled(count_line("large eggs", 3), factor)
+                self.assertEqual(eggs["scaled_imperial"], expected)
+                rounded = [n for kind, n in eggs["flags"] if kind == "rounded"]
+                if note:
+                    self.assertTrue(rounded[0].startswith(note), rounded)
+                else:
+                    self.assertEqual(rounded, [])
+
+    def test_a_weighed_egg_rounds_its_count_and_keeps_its_grams(self):
+        eggs = self.scaled(metric_slash("100 g / 2 large eggs"), 1.25)
+        self.assertEqual((eggs["scaled_metric"], eggs["scaled_imperial"]), (125, 3))
+
+    def test_a_weighed_crust_is_scaled(self):
+        crust = self.scaled({**count_line("pie crust", 1), "metric_amount": 300.0, "metric_unit": "g"}, 1.5)
+        self.assertEqual(crust["scaled_metric"], 450)
+
     def test_other_counts_and_measures_are_unchanged(self):
-        self.assertAlmostEqual(self.scaled(count_line("large eggs", 3), 1.125)["scaled_imperial"], 3.375)
+        self.assertAlmostEqual(self.scaled(count_line("onions", 3), 1.125)["scaled_imperial"], 3.375)
         self.assertAlmostEqual(self.scaled(count_line("crust crumbs", 1, "cup"), 1.5)["scaled_imperial"], 1.5)
+
+
+
+class SplitPlusTest(unittest.TestCase):
+    """A line naming a second ingredient with its own amount."""
+    BOOK = strategy_for("The Complete Cooking For Two Cookbook")
+
+    def split(self, line):
+        ing = profile_for(self.BOOK).parse_ingredient_line(line)
+        return [(i["name"], i["imperial_amount"], i["imperial_unit"], i.get("plus", False))
+                for i in split_plus(ing, self.BOOK)]
+
+    def test_two_ingredients(self):
+        self.assertEqual(self.split("1 large egg plus 1 large yolk"),
+                         [("large egg", 1, None, False), ("large egg yolk", 1, None, True)])
+        self.assertEqual(self.split("¼ teaspoon grated lemon zest plus 1 teaspoon juice"),
+                         [("grated lemon zest", 0.25, "teaspoon", False), ("lemon juice", 1, "teaspoon", True)])
+        self.assertEqual(self.split("2 teaspoons grated lemon zest and 1 tablespoon juice (from 1 lemon)")[1],
+                         ("lemon juice (from 1 lemon)", 1, "tablespoon", True))
+        self.assertEqual(self.split("1 sprig fresh thyme, plus ¼ teaspoon minced")[1], ("minced", 0.25, "teaspoon", True))
+
+    def test_left_as_one_line(self):
+        for line in ("2 limes, 1 halved and 1 quartered", "⅓cup (1⅔ ounces) plus 8 teaspoons all-purpose flour",
+                     "1 cup milk or 1 cup water plus 2 tablespoons milk powder"):
+            with self.subTest(line=line):
+                self.assertEqual(len(self.split(line)), 1)
+
+    def test_weighed_lines(self):
+        ing = metric_slash("170 g / ¾ cup extra virgin olive oil, plus 1 tablespoon")
+        self.assertEqual([(i["name"], i["metric_amount"], i["imperial_amount"], i["imperial_unit"])
+                          for i in split_plus(ing, strategy_for("Savory Baking"))],
+                         [("extra virgin olive oil", 170, 0.75, "cup"), ("extra virgin olive oil", None, 1, "tablespoon")])
+        self.assertEqual(self.split("1½ cups medium-spicy or spicy cabbage kimchi, plus 2 tablespoons kimchi liquid")[1],
+                         ("kimchi liquid", 2, "tablespoon", True))
+
+    def test_both_are_scaled_and_shown(self):
+        ing = profile_for(self.BOOK).parse_ingredient_line("1 large egg plus 1 large yolk")
+        lines = [scaled_ingredient_lines(i)[0] for i in scale_ingredients(split_plus(ing, self.BOOK), 2)]
+        self.assertEqual(lines, ["  large egg: 1 whole  ->  2 whole", "  plus large egg yolk: 1 whole  ->  2 whole"])
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from books import strategy_for
 from query_utils.recipe_matching import display_title, extract_title, extract_yield_line
 from query_utils.retrieval import candidate_text, retrieve, within_distance
 from query_utils.title_lookup import find_recipes, title_tokens
-from scale_utils.ingredients import extract_ingredient_groups, pick_default_batch
+from scale_utils.ingredients import extract_ingredient_groups, pick_default_batch, split_plus
 from scale_utils.measurement_display import count_unit_label, format_imperial_amount, to_teaspoons
 from scale_utils.pan_scaling import detect_pan_request, pan_scale_factor_from_question
 from scale_utils.recipe_scaling import (MAX_SANE_FACTOR, MIN_SANE_FACTOR, detect_direct_multiplier,
@@ -149,6 +149,9 @@ def scale_recipe(recipe, question, base=1.0, batch=None, factor=None, explanatio
 
     strategy = strategy_for(recipe.book)
     groups = extract_ingredient_groups(recipe_text, strategy)
+    # "3 eggs plus 1 yolk": two ingredients, each scaled.
+    for name in groups:
+        groups[name] = [piece for ing in groups[name] for piece in split_plus(ing, strategy)]
 
     if cli.DEBUG:
         print(f"[debug] ingredient rules: {strategy}, groups: {list(groups) or '(none)'}")
@@ -289,7 +292,7 @@ def scaled_ingredient_lines(ing):
     if ing["qualifier"]:
         orig, scaled = f"{ing['qualifier']} {orig}", f"{ing['qualifier']} {scaled}"
 
-    lines = [f"  {ing['name']}: {orig}  ->  {scaled}"]
+    lines = [f"  {'plus ' if ing.get('plus') else ''}{ing['name']}: {orig}  ->  {scaled}"]
     for flag_type, note in ing["flags"]:
         marker = "[!]" if flag_type == "non_scalable" else "[i]"
         lines.append(f"      {marker} {note}")

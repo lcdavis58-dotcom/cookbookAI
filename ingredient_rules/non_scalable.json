@@ -3,7 +3,7 @@
   "ingredients": [
     {
       "keyword": "egg",
-      "note": "Eggs don't divide cleanly. If the scaled amount isn't a whole number, round to the nearest whole egg, or whisk one egg and measure out a partial amount by volume (about 3 tablespoons per large egg) if precision matters."
+      "note": "Eggs don't divide cleanly, so the count is rounded to whole eggs. For an exact amount, whisk one egg and measure part of it: a large egg is about 3 tablespoons, a yolk about 1, a white about 2."
     },
     {
       "keyword": "graham cracker",
