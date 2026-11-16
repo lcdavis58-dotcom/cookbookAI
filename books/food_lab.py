@@ -24,6 +24,12 @@ import re
 TITLE_MIN_SIZE = 21
 TITLE_BOLD = True
 YIELD_RE = re.compile(r"^(?:SERVES|MAKES)\b")
+# A few recipes have no yield line ("PERFECT POACHED EGGS" / "3 quarts
+# water").
+TITLE_THEN_INGREDIENTS = True
+# Components printed inside another recipe: a bold line at body size,
+# then their own yield ("Caesar Salad Dressing" / "MAKES ABOUT 1½ CUPS").
+COMPONENT_TITLE_MIN_SIZE = 11.3
 INGREDIENT_STYLE = "volume_paren_metric"
 # The method of a short recipe isn't numbered ("Whisk together all of the
 # ingredients..."); those lines are rejected and dropped. Ending the list

@@ -26,6 +26,9 @@ TITLE_MIN_SIZE = 21
 YIELD_RE = re.compile(r"^MAKES:")
 HEADER_FIELD_RE = re.compile(r"^TIME:")
 INGREDIENT_STYLE = "volume_paren_metric"
+# "1 recipe Béchamel" (Eggs au Gratin); title lookup won't take one word
+# of a two-word title.
+TITLE_ALIASES = {"Béchamel Sauce, 11 Ways": ["Béchamel"]}
 # Nothing marks a step in the text; the list ends at the blank line
 # ingest puts before the method (ingredient_end).
 STEP_RE = re.compile(r"(?!)")

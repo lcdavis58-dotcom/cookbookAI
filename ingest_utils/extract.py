@@ -39,7 +39,7 @@ from common.config import EXTRACT_DIR
 
 # Bump when the saved shape or the text rules change, so old saved
 # extractions get rebuilt instead of read.
-EXTRACT_VERSION = 5
+EXTRACT_VERSION = 6
 
 # Typographic ligatures some PDFs store as a single character (Dessert
 # Person stores "Difficulty" as "Difﬁculty" and "flour" as
@@ -57,6 +57,9 @@ LIGATURES = str.maketrans({
     "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl",
     "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "st", "ﬆ": "st",
     "ʃ": "ff", "ɹ": "fi", "ɻ": "fl", "ɽ": "ffi", "ʀ": "ffl",
+    # Dessert Person's "ft" ligature lands in the private use area ("So
+    # and Pillowy Flatbread", "aer").
+    "": "ft",
 })
 
 # The Food Lab's fonts map its fraction glyphs to accented letters

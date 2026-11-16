@@ -19,25 +19,25 @@ from common.config import BOOK_FILES
 from testing.local.needs import books_found, needs_pdfs
 from tools.diagnostics.structure_baseline import snapshot
 
-# Recipes found per book (2026-11-15), and how many of them may have no
+# Recipes found per book (2026-11-16), and how many of them may have no
 # required ingredients (prose-only recipes, layer cakes made of other
 # recipes; see BOOK_FORMATS.md Follow-ups).
 RECIPES = {
     "The Book On Pie": (128, 0),
-    "Dessert Person": (105, 0),
+    "Dessert Person": (108, 0),
     "BraveTart": (100, 1),
     "Flour Water Salt Yeast": (37, 0),
     "Genius Desserts": (92, 0),
     "Genius Recipes": (92, 0),
     "How to Cook Everything Vegetarian": (729, 2),
     "Momofuku Milk Bar": (129, 13),
-    "Ratio": (65, 1),
+    "Ratio": (68, 1),
     "Salt Fat Acid Heat": (94, 0),
     "Savory Baking": (149, 19),
-    "The Complete Cooking For Two Cookbook": (436, 0),
+    "The Complete Cooking For Two Cookbook": (437, 0),
     "The Cookie Book": (74, 0),
-    "The Fearless Baker": (106, 0),
-    "The Food Lab": (243, 0),
+    "The Fearless Baker": (108, 0),
+    "The Food Lab": (251, 0),
     "What's For Dessert": (104, 0),
 }
 

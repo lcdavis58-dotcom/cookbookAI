@@ -78,6 +78,12 @@ class FindMatchesTest(unittest.TestCase):
         results, _ = find_matches(index, ["pumpkin"])
         self.assertEqual(titles(results), ["Pie"])
 
+    def test_whole_and_its_part_are_one_thing_to_get(self):
+        # Cheesecake Pie listed both "lemon" and "lemon juice" as missing.
+        results, _ = find_matches([entry("Cheesecake Pie", ["pecan", "lemon", "lemon juice", "lime zest"])],
+                                  ["pecan"])
+        self.assertEqual(results[0]["missing"], ["lemon", "lime zest"])
+
     def test_falls_back_to_some_and_says_so(self):
         index = [entry("Some", ["pecan", "sage"]), entry("Neither", ["sage"])]
         results, partial = find_matches(index, ["pecan", "lemon"])

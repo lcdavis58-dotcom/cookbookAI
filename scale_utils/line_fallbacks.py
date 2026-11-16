@@ -89,6 +89,12 @@ def _result(line, name, metric=None, metric_unit=None, imperial=None, imperial_u
     }
 
 
+def unmeasured_result(line):
+    """A line with no amount ("Nonstick cooking spray") as an ingredient,
+    for a book that knows it's one when the shared rules can't tell."""
+    return _result(line, line, unmeasured=True)
+
+
 def _looks_unmeasured(line):
     return (len(line) <= UNMEASURED_MAX_CHARS
             and line[:1].isupper()

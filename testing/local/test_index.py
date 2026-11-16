@@ -42,13 +42,13 @@ class IndexTest(unittest.TestCase):
     def test_what_can_i_make(self):
         result = match.run("cinnamon, heavy cream")
         self.assertEqual(result.kind, "matches")
-        self.assertEqual(len(result.missing_some), 32)
+        self.assertEqual(len(result.missing_some), 34)
         self.assertIn("Apple Galette", titles(result.missing_some))
 
     def test_typo_is_corrected(self):
         result = match.run("cinammon, heavy cream")
         self.assertTrue(result.corrections)
-        self.assertEqual(len(result.missing_some), 32)
+        self.assertEqual(len(result.missing_some), 34)
 
 
 @needs_database
