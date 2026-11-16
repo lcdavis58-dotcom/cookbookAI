@@ -18,7 +18,7 @@ from testing.unit.test_chat_router import CANDIDATES, ref  # noqa: F401  (also s
 from actions.ask import AskResult  # noqa: E402
 from actions.match import MatchResult  # noqa: E402
 from actions.scale import ScaleResult  # noqa: E402
-from chat import store, turn  # noqa: E402
+from chat import flags, store, turn  # noqa: E402
 from chat.state import ChatState, Numbered, Pending  # noqa: E402
 from chat.terminal import Terminal, when  # noqa: E402
 
@@ -42,10 +42,12 @@ class Script:
 class TerminalTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        self.flags = tempfile.mkdtemp()
         self.out = []
 
     def tearDown(self):
         shutil.rmtree(self.dir)
+        shutil.rmtree(self.flags)
 
     def run_terminal(self, lines, **options):
         """Run the terminal on scripted lines. Actions don't run (they'd
@@ -60,7 +62,8 @@ class TerminalTest(unittest.TestCase):
                     "scale": ScaleResult("not_found", reason="no_recipe"),
                     "match": MatchResult("no_ingredients")}[route.action]
 
-        term = Terminal(read=script, write=self.out.append, directory=self.dir, candidates=CANDIDATES)
+        term = Terminal(read=script, write=self.out.append, directory=self.dir, candidates=CANDIDATES,
+                        flags_dir=self.flags)
         with mock.patch.object(turn, "run_route", side_effect=fake_run):
             term.run(**options)
         return term, script
@@ -152,6 +155,38 @@ class TerminalTest(unittest.TestCase):
                 self.assertIn(expected, self.text())
                 self.assertEqual(term.state.unanswered(), "anything at all")
                 self.assertTrue(self.text().endswith("Chat saved."))
+
+    def test_flag_the_last_reply(self):
+        term, _ = self.run_terminal(["halve it", "/flag", "/flag"], new=True)
+        [f] = flags.all_flags(self.flags)[0]
+        self.assertEqual((f.account, f.chat_id, f.message, f.note), (flags.TERMINAL, term.state.id, 2, ""))
+        self.assertEqual(f.reply["text"], NEED_RECIPE)
+        self.assertIn(f"Flagged the last reply as wrong ({f.id})", self.text())
+        self.assertIn("The last reply is already flagged.", self.text())
+
+    def test_nothing_to_flag_yet(self):
+        self.run_terminal(["/flag", "/unflag"], new=True)
+        self.assertIn("There's no reply to flag yet.", self.text())
+        self.assertIn("The last reply isn't flagged.", self.text())
+        self.assertEqual(flags.all_flags(self.flags), ([], []))
+
+    def test_unflag(self):
+        self.run_terminal(["halve it", "/flag", "/unflag", "/unflag"], new=True)
+        self.assertIn("Took the flag off the last reply.", self.text())
+        self.assertIn("The last reply isn't flagged.", self.text())
+        self.assertEqual(flags.all_flags(self.flags), ([], []))
+
+    def test_a_handled_flag_stays(self):
+        old = self.saved()
+        f = flags.flag(old, 2, flags.TERMINAL, directory=self.flags)
+        flags.mark_handled(f.id, "1.1.2", self.flags)
+        self.run_terminal(["y", "/unflag"])
+        self.assertIn("already handled, so it stays", self.text())
+        self.assertEqual(len(flags.all_flags(self.flags)[0]), 1)
+
+    def test_help_lists_flag(self):
+        self.run_terminal(["/help"], new=True)
+        self.assertIn("/flag", self.text())
 
     def test_unknown_command(self):
         self.run_terminal(["/bake"], new=True)

@@ -5,6 +5,8 @@ turn at a time (chat/turn.py), and saved chats opened again.
 Opening a saved chat re-finds its recipes in the current index
 (chat.state.refresh) and says which are gone, shows the last two
 exchanges, and offers to answer a message that never got a reply.
+/flag marks the last reply as wrong (chat/flags.py), for
+tools/flagged.py to list.
 
 Reading and writing go through the read and write functions given, so
 tests can drive it with scripted input.
@@ -13,11 +15,11 @@ tests can drive it with scripted input.
 import traceback
 from datetime import datetime, timedelta
 
-from chat import store, turn
+from chat import flags, store, turn
 from chat.router import load_candidates
 from chat.state import ChatState, refresh
 from common import cli, models
-from common.config import CHATS_DIR
+from common.config import CHATS_DIR, FLAGS_DIR
 
 HISTORY_TURNS = 4                   # the last two exchanges
 HISTORY_LINES = 3                   # lines shown of each
@@ -26,6 +28,8 @@ HELP = """Type a message, or one of:
   /new       start a new chat
   /list      list saved chats
   /open N    open chat N from the list (or by its name)
+  /flag      mark the last reply as wrong
+  /unflag    take that back
   /quit      leave (every message is already saved)
   /help      this list"""
 
@@ -52,9 +56,10 @@ def when(stamp, now=None):
 
 
 class Terminal:
-    def __init__(self, read=input, write=print, directory=CHATS_DIR, candidates=None):
+    def __init__(self, read=input, write=print, directory=CHATS_DIR, candidates=None, flags_dir=FLAGS_DIR):
         self.read, self.write = read, write
         self.directory = directory
+        self.flags_dir = flags_dir
         self._candidates = candidates
         self.state = None
 
@@ -147,6 +152,28 @@ class Terminal:
             self.new()
         return True
 
+    # -- flagging --
+
+    def flag(self):
+        number = flags.last_reply(self.state)
+        if number is None:
+            self.write("There's no reply to flag yet.")
+            return
+        if flags.find(flags.TERMINAL, self.state.id, number, self.flags_dir):
+            self.write("The last reply is already flagged.")
+            return
+        f = flags.flag(self.state, number, flags.TERMINAL, directory=self.flags_dir)
+        self.write(f"Flagged the last reply as wrong ({f.id}). tools/flagged.py lists it.")
+
+    def unflag(self):
+        number = flags.last_reply(self.state)
+        try:
+            removed = number is not None and flags.unflag(flags.TERMINAL, self.state.id, number, self.flags_dir)
+        except flags.FlagError:
+            self.write("The last reply's flag is already handled, so it stays.")
+            return
+        self.write("Took the flag off the last reply." if removed else "The last reply isn't flagged.")
+
     # -- the loop --
 
     def answer(self, work):
@@ -191,6 +218,10 @@ class Terminal:
                 state = self.find_chat(arg)
                 if state is not None:
                     self.open(state)
+        elif name == "flag":
+            self.flag()
+        elif name == "unflag":
+            self.unflag()
         elif name == "help":
             self.write(HELP)
         else:
