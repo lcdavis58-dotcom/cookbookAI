@@ -59,6 +59,36 @@ def check_ingredient_flags(ingredient_name):
     return flags
 
 
+WHOLE_ITEMS_PATH = os.path.join(PROJECT_ROOT, "ingredient_rules", "whole_items.json")
+_COUNT_EXCEPT = ("cup", "tablespoon", "teaspoon", "tbsp", "tsp", "oz", "ounce", "lb", "pound", "gallon", "quart",
+                 "pint")
+
+
+def whole_item(ing):
+    """For a counted ingredient that only comes whole
+    (ingredient_rules/whole_items.json): ("not_scaled", note) for a crust,
+    ("whole", None) for a can, ("rough", None) for a pinch; None for anything else,
+    including anything weighed or measured."""
+    unit = (ing.get("imperial_unit") or "").lower()
+    if ing.get("metric_amount") or not ing.get("imperial_amount") or any(u in unit for u in _COUNT_EXCEPT):
+        return None
+    try:
+        with open(WHOLE_ITEMS_PATH) as f:
+            rules = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Warning: couldn't load {WHOLE_ITEMS_PATH} ({e}), continuing without these rules.")
+        return None
+    text = f"{unit} {ing['name'].lower().split(',', 1)[0]}"
+    not_scaled = rules.get("not_scaled", {})
+    if any(_keyword_matches(k, text) for k in not_scaled.get("keywords", [])):
+        return "not_scaled", not_scaled.get("note", "Not scaled.")
+    if any(_keyword_matches(k, text) for k in rules.get("whole_units", [])):
+        return "whole", None
+    if any(_keyword_matches(k, text) for k in rules.get("rough_units", [])):
+        return "rough", None
+    return None
+
+
 def _keyword_matches(keyword, name):
     """Whole-word match, plural allowed: "egg" matches "large eggs" and
     "egg whites" but not "eggplant"."""

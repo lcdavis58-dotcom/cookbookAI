@@ -109,7 +109,22 @@ class RulesTest(unittest.TestCase):
         ("actually, leave out the pecans", after_match, "rule: match remove"),
         ("show me #1", after_match, "rule: ask show #1"),
         ("scale the first one by 2x", after_match, "rule: scale #1"),
+        # 1.1.2: an ingredient named like a multiplier, and new scaling phrasings
+        ("half and half, brown sugar, lemons", fresh, "rule: match list"),
+        ("make this one bigger, enough for a crowd of 20", on_recipe, "rule: scale current"),
+        ("scale that by 3", on_recipe, "rule: scale current"),
+        ("make it half again as much", on_recipe, "rule: scale current"),
+        ("this usually feeds 5 people, make it feed 8", on_recipe, "rule: scale current"),
     ]
+
+    def test_sentences_with_commas_and_half_and_half_arent_rules(self):
+        # Were "rule: match list" (her sentence kept as two ingredients)
+        # and "rule: reply need recipe" (half and half read as halving).
+        for message, make_state in [("i don't like this one, show me the one from dessert person", on_recipe),
+                                    ("do any of these use half and half", after_match)]:
+            with self.subTest(message=message):
+                result, called_model = route(make_state(), message)
+                self.assertTrue(called_model, result.label)
 
     def test_cases(self):
         for message, make_state, expected in self.CASES:

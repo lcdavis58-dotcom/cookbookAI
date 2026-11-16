@@ -131,7 +131,7 @@ class ScaleRecipeTest(unittest.TestCase):
         intent = {"basis": "yield", "target_yield": 12, "original_yield": 1}
         result = self.scale(TWO_CREAMS, "scale it for 12 people", intent)
         self.assertEqual((result.kind, result.problem), ("no_factor", "unresolved"))
-        self.assertIn("isn't a number of servings", result.explanation)
+        self.assertIn("not as servings or pieces", result.explanation)
         # Unless she says what it makes herself.
         intent = {"basis": "yield", "target_yield": 3, "original_yield": 1}
         self.assertEqual(self.scale(TWO_CREAMS, "this makes 1 cup, I need 3", intent).factor, 3.0)
@@ -139,7 +139,7 @@ class ScaleRecipeTest(unittest.TestCase):
     def test_a_made_up_yield_is_refused(self):
         intent = {"basis": "yield", "target_yield": 12, "original_yield": 13}
         result = self.scale(TWO_CREAMS, "scale it for 12 people", intent)
-        self.assertIn("couldn't find how much the recipe makes", result.explanation)
+        self.assertIn("couldn't tell how many this recipe makes", result.explanation)
 
     def test_a_target_ignores_the_base(self):
         intent = {"basis": "ingredient_constraint", "reference_ingredient": "heavy cream",

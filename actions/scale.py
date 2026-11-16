@@ -23,7 +23,7 @@ from scale_utils.measurement_display import count_unit_label, format_imperial_am
 from scale_utils.pan_scaling import detect_pan_request, pan_scale_factor_from_question
 from scale_utils.recipe_scaling import (MAX_SANE_FACTOR, MIN_SANE_FACTOR, detect_direct_multiplier,
                                         determine_scale_intent, normalize_basis, resolve_scale_factor,
-                                        scale_ingredients)
+                                        scale_ingredients, stated_yield_factor)
 
 
 @dataclass
@@ -195,6 +195,9 @@ def scale_recipe(recipe, question, base=1.0, batch=None, factor=None, explanatio
         factor, explanation = pan_scale_factor_from_question(question)
         if factor is None:
             return ScaleResult("no_factor", **found, problem="pan", explanation=explanation)
+    elif (stated := stated_yield_factor(question)) is not None:
+        # "it usually feeds 5, make it feed 8": her numbers, no model.
+        factor, explanation = stated
     else:
         intent, elapsed = determine_scale_intent(question, title, yield_line, ingredients)
         if intent is None:
@@ -208,8 +211,10 @@ def scale_recipe(recipe, question, base=1.0, batch=None, factor=None, explanatio
         factor = base * relative
         explanation = f"{times(relative)} the {times(base)} version = {times(factor)} the recipe as written"
         if not MIN_SANE_FACTOR <= factor <= MAX_SANE_FACTOR:
+            limit = "more" if factor > MAX_SANE_FACTOR else "less"
             return ScaleResult("no_factor", **found, **model, problem="unresolved",
-                               explanation=f"{explanation}, which is outside the range I'll scale to")
+                               explanation=f"That would be {times(factor)} the recipe as written ({times(relative)} "
+                                           f"the {times(base)} version), {limit} than I'll scale to.")
 
     if factor == "ambiguous":
         return ScaleResult("no_factor", **found, **model, problem="ambiguous", ambiguous=explanation)
@@ -275,6 +280,7 @@ def scaled_ingredient_lines(ing):
         # large or awkward number. Non-volume imperial units (ounces,
         # bare counts) fall back to plain rounding inside this function.
         imp_display, imp_rounded = format_imperial_amount(ing["scaled_imperial"], ing["imperial_unit"])
+        imp_rounded = imp_rounded or ing.get("scaled_imperial_rounded")
         imperial_str = f"{'~' if imp_rounded else ''}{imp_display}"
 
     scaled = " / ".join(filter(None, [metric_str, imperial_str]))
@@ -344,15 +350,15 @@ def render(result):
 
     if kind == "no_factor":
         if result.problem == "pan":
-            lines.append(f"Couldn't resolve a pan-size scale factor: {result.explanation}")
+            lines.append(f"I couldn't scale this by pan size. {result.explanation}")
         elif result.problem == "no_intent":
-            lines += ["I couldn't determine how you want to scale this recipe.",
-                      'Try rephrasing, e.g. "double it" or "scale it for 10 people".']
+            lines += ["I couldn't tell how you want to scale this recipe.",
+                      'Try "double it", "make it for 10", or how much of one ingredient you have.']
         elif result.problem == "ambiguous":
             lines += [f"That ingredient matches more than one item in this recipe: {', '.join(result.ambiguous)}",
                       "Try being more specific about which one you mean."]
         else:
-            lines.append(f"Couldn't resolve a scale factor: {result.explanation}")
+            lines.append(result.explanation)
         return "\n".join(lines)
 
     lines.append(f"{result.explanation}\n")

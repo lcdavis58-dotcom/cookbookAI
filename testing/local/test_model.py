@@ -59,8 +59,7 @@ class ScaleIntentTest(unittest.TestCase):
     def test_yield_she_states(self):
         self.check("this usually feeds 5 people, make it feed 8", 1.6)
 
-    @unittest.skip("known gap, planned for 1.1.2: the model uses the yield line's 8, not her 4")
-    def test_yield_she_states_known_gap(self):
+    def test_yield_she_states_over_the_yield_line(self):
         self.check("it normally serves 4, i want 10", 2.5)
 
     def test_ingredient_she_has(self):
@@ -134,8 +133,7 @@ class AnswerTest(unittest.TestCase):
 class RealChatTest(unittest.TestCase):
     """Replays of real chats, through routing, the actions and the model."""
 
-    @unittest.skip("known gap, planned for 1.1.2: chat 2026-11-12-2131-sz7k got 1.000x and 1.125x")
-    def test_pumpkin_pie_for_more_people_known_gap(self):
+    def test_pumpkin_pie_for_more_people(self):
         state = ChatState.new()
         turn.respond(state, "show me a pumpkin pie recipe")
         self.assertEqual(turn.respond(state, "4").result.recipe.title, "Pumpkin Pie with Pecan Crunch")

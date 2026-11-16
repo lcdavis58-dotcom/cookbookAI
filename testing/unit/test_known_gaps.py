@@ -27,7 +27,6 @@ from scale_utils.recipe_scaling import resolve_scale_factor  # noqa: E402
 
 
 class KnownGapsTest(unittest.TestCase):
-    @unittest.skip("known gap, planned for 1.1.2: a count is divided by the line's grams")
     def test_eggs_she_has_against_a_weighed_count(self):
         # "100 g / 2 large eggs" with "I only have 1 egg" gives 1 / 100.
         eggs = [metric_slash("100 g / 2 large eggs")]
@@ -36,7 +35,6 @@ class KnownGapsTest(unittest.TestCase):
         factor, explanation = resolve_scale_factor(intent, eggs)
         self.assertEqual(factor, 0.5, explanation)
 
-    @unittest.skip("known gap, planned for 1.1.2: a sentence with a comma is read as an ingredient list")
     def test_sentence_with_a_comma_isnt_an_ingredient_list(self):
         candidates = candidates_from_index([{"recipe_id": "r1", "book": "Dessert Person", "title": "Lemon Curd",
                                              "page": 0, "page_confirmed": False}])

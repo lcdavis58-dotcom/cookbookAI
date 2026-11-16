@@ -143,9 +143,9 @@ def pan_scale_factor(original_text, target_text):
     target = extract_pan_shape(target_text)
 
     if original is None:
-        return None, "Couldn't find a pan size in the recipe's own yield line"
+        return None, "The recipe doesn't say what size pan it uses."
     if target is None:
-        return None, "Couldn't find a pan size in your request"
+        return None, "I couldn't find a pan size in what you asked."
 
     orig_area = pan_area(original)
     target_area = pan_area(target)
@@ -214,11 +214,11 @@ def pan_scale_factor_from_question(question):
     pans = extract_all_pan_shapes(question)
 
     if len(pans) < 2:
-        return None, (f"Found {len(pans)} pan size(s) in your question, need two "
-                       f"(the recipe's pan and the one you have) to scale by pan size.")
+        return None, ("I need two pan sizes, the recipe's and yours "
+                      '(like "the recipe uses a 9x13, I have an 8x8").')
     if len(pans) > 2:
-        return None, (f"Found {len(pans)} pan sizes in your question, not sure which "
-                       f"two to compare. Try mentioning just the recipe's pan and yours.")
+        return None, (f"You mentioned {len(pans)} pan sizes, and I'm not sure which two to compare. "
+                      "Name just the recipe's pan and yours.")
 
     # Re-find positions to check cues (extract_all_pan_shapes doesn't
     # expose them), matching the same logic it uses internally.

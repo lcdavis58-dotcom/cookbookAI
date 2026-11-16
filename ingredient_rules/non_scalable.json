@@ -10,10 +10,6 @@
       "note": "Whole crackers/sheets don't split cleanly. Round to the nearest whole cracker, extra crumbs from a slightly-over amount are rarely a problem."
     },
     {
-      "keyword": "pie crust",
-      "note": "A pie crust isn't a divisible quantity. Scaling likely means you need a different pan size or an extra crust, not a fractional one."
-    },
-    {
       "keyword": "sheet of gelatin",
       "note": "Gelatin sheets are discrete units. Round to the nearest whole sheet, sheet gelatin has some flex in practice."
     }
