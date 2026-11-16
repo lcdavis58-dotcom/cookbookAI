@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.0.1
+Version 1.1.0
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
@@ -177,7 +177,6 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.1.0:** flag a reply as wrong on the website, with an optional note on what was wrong, and list every flagged reply for planning fixes and tests
 - **1.1.1:** clean up oddly read ingredient names (like "flour for rolling" counted as missing), link the remaining sub-recipes, ingredient parser fixes
 - **1.1.2:** understand what's asked for: stop reading some sentences as ingredient lists ("..., show me the one from dessert person") or "half and half" as halving, scale to a number of people from the servings you say the recipe makes ("it usually feeds 5"), scale by a count you have ("I only have 1 egg") when the recipe also gives that ingredient's weight, read "half again as much" and "scale that by 3", stop scaling a pie crust or a pinch of salt to "~1.12 whole", and word scaling refusals plainly
 - **1.1.3:** find the right recipe: "butter cream" finds Buttercream, say when a recipe was found through its variation, show a recipe named in part ("the extra-thick one"), answer a question that names a recipe instead of showing it, see results past the first 15, and better ordering when results tie
