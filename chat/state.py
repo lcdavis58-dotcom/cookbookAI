@@ -67,9 +67,14 @@ class RecipeRef:
 
 @dataclass
 class Numbered:
-    """A numbered list that was shown. source is the action it came from."""
+    """A numbered list that was shown. source is the action it came from.
+    "more" shows the next part of a long list, numbered on from the
+    last: rest is what a "which one?" list hasn't shown yet, pages how
+    many pages of match results have been shown."""
     source: str
     items: list                     # RecipeRef, in the order numbered
+    rest: list = field(default_factory=list)    # RecipeRef, not shown yet
+    pages: int = 1
 
 
 @dataclass
@@ -151,7 +156,9 @@ class ChatState:
         numbered = f.get("numbered")
         focus = Focus(
             recipe=_ref(f.get("recipe")),
-            numbered=Numbered(numbered["source"], [_ref(r) for r in numbered["items"]]) if numbered else None,
+            numbered=Numbered(numbered["source"], [_ref(r) for r in numbered["items"]],
+                              [_ref(r) for r in numbered.get("rest") or []],
+                              numbered.get("pages", 1)) if numbered else None,
             have=list(f.get("have") or []),
             scale=ScaleUsed(**f["scale"]) if f.get("scale") else None,
             pending=Pending(**f["pending"]) if f.get("pending") else None,
@@ -180,14 +187,17 @@ def remember(state, action, request, result):
                                      (a different recipe also clears scale,
                                      everywhere recipe is set)
         ask, answer                  nothing pending (she moved on)
-        ask or scale, choices        numbered = the choices; pending: pick one,
-                                     for this request
+        ask or scale, choices        numbered = the choices (and the rest, for
+                                     "more"); pending: pick one, for this
+                                     request. A later page of the list
+                                     (start > 1) is added to numbered.
         scale, scaled                recipe, scale; nothing pending
         scale, pick_batch            recipe; pending: pick a batch, for this request
         scale, no_factor or
                no_ingredients        recipe (it was found); nothing pending
-        match, matches               have, numbered = the recipes shown;
-                                     nothing pending
+        match, matches               have, numbered = the recipes shown (a
+                                     later page is added to it); nothing
+                                     pending
         anything else (not found,    unchanged, so a failed follow-up doesn't
         nothing relevant, ...)       lose the current recipe or question
     """
@@ -202,8 +212,14 @@ def remember(state, action, request, result):
         focus.recipe = ref
 
     if kind == "choices" and action in ("ask", "scale"):
-        focus.numbered = Numbered(action, [RecipeRef.from_candidate(c) for c in result.choices])
-        focus.pending = Pending("pick_recipe", action, request)
+        shown = [_as_ref(c) for c in result.choices]
+        rest = [_as_ref(c) for c in getattr(result, "rest", [])]
+        if getattr(result, "start", 1) > 1 and focus.numbered:
+            focus.numbered.items += shown
+            focus.numbered.rest = rest
+        else:
+            focus.numbered = Numbered(action, shown, rest)
+            focus.pending = Pending("pick_recipe", action, request)
     elif action == "ask" and kind == "recipe":
         show(result.recipe)
         focus.pending = None
@@ -220,12 +236,21 @@ def remember(state, action, request, result):
         show(result.recipe)
         focus.pending = None
     elif action == "match" and kind == "matches":
-        from actions.match import SHOW_PER_SECTION  # what the list shows, numbered in that order
-        shown = [r for section in (result.ready, result.from_scratch, result.missing_some)
-                 for r in section[:SHOW_PER_SECTION]]
+        from actions.match import page_of  # what the list shows, numbered in that order
+        shown = [RecipeRef.from_entry(r["entry"]) for r in page_of(result)]
         focus.have = list(result.have)
-        focus.numbered = Numbered("match", [RecipeRef.from_entry(r["entry"]) for r in shown])
+        if result.page and focus.numbered and focus.numbered.source == "match":
+            focus.numbered.items += shown
+            focus.numbered.pages = result.page + 1
+        else:
+            focus.numbered = Numbered("match", shown)
         focus.pending = None
+
+
+def _as_ref(item):
+    """A RecipeRef for a Candidate, or the RecipeRef itself (a later
+    page of a list is shown from the refs it saved)."""
+    return item if isinstance(item, RecipeRef) else RecipeRef.from_candidate(item)
 
 
 # ---- finding saved recipes again ----------------------------------------
@@ -266,6 +291,6 @@ def refresh(state, candidates):
         if focus.pending and focus.pending.kind == "pick_batch":
             focus.pending = None
     if focus.numbered:
-        for ref in focus.numbered.items:
+        for ref in focus.numbered.items + focus.numbered.rest:
             check(ref)
     return gone

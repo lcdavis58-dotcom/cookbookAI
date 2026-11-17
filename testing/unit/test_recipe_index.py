@@ -211,6 +211,7 @@ class SummarizeTest(unittest.TestCase):
             f"  {BOOK}: 1",
             "  1 with no required ingredients: Toast",
             '  1 ingredient choices ("X or Y") split into options',
+            "  0 variations named, in 0 recipes",
         ])
 
     def test_long_list_is_cut_short(self):

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.1.2
+Version 1.1.3
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
@@ -44,9 +44,9 @@ Scaling 'Classic Whipped Cream' (Full Batch) from The Book On Pie... 2.0x
 
 Every message is saved as it's sent (in `chats/`), so a chat can be picked up later: `python3 chat.py` offers to continue the latest one and to answer a message that never got a reply. `--new` starts a new chat, `--list` lists them, `--open N` opens one; in a chat, `/help` lists the commands, and `/flag` marks the last reply as wrong (see Flagged replies below). Plain rules handle the common follow-ups; anything else goes to the chat model, and when it's unclear what you mean, it asks.
 
-In a chat, "what pumpkin pie recipes do I have" lists every recipe with those words in its title, by book, and a general name like "pie crust" lists every recipe of that kind, whatever the book calls it.
+In a chat, "what pumpkin pie recipes do I have" lists every recipe with those words in its title, by book, and a general name like "pie crust" lists every recipe of that kind, whatever the book calls it. "More" shows the rest of a long list, numbered on from it. With a recipe on screen, "what about the extra-thick one" shows another recipe of that dish, and "show me the one from dessert person" shows that book's.
 
-**Ask about a recipe** (`query.py`): finds a recipe by its title (forgiving of plurals, accents, typos and filler words; add "from <book>" to pick a book, misspelled, shortened or as an acronym like "sfah") or by semantic search, and answers using only the text of your books, with book and page citations.
+**Ask about a recipe** (`query.py`): finds a recipe by its title (forgiving of plurals, accents, typos, filler words and words written apart or together, "butter cream" for "Buttercream"; add "from <book>" to pick a book, misspelled, shortened or as an acronym like "sfah") or by semantic search, and answers using only the text of your books, with book and page citations. A variation printed inside a recipe finds that recipe, and the reply says so ("Brown Butter Cream Cheese Frosting is a variation of Classic Cream Cheese Frosting"). A question that names a recipe ("what can I substitute for buttermilk in the pancakes?") is answered from that recipe's text instead of showing it. When no title matches exactly, the closest one is shown if it's clearly the closest.
 
 ```
 python3 query.py "What page has the recipe for sweet tart dough?"
@@ -60,7 +60,7 @@ python3 scale.py "the chocolate whipped cream feeds 6, I need 10"
 python3 scale.py "classic whipped cream needs 2 eggs, I only have 1"
 ```
 
-**Find recipes from what you have** (`match.py`): lists recipes that use what you name, the ones using the most of it first, then the ones missing the least. A recipe has to use all of one or two ingredients, or two-thirds of a longer list; if none do, it says so and shows the closest. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand, and don't count toward how much of your list a recipe uses. A recipe that calls for another of the book's recipes (a crust, a curd, a sauce) counts it as on hand if you have it, have a general form of it ("pie crust" for a specific pie dough), or can make it from what you have. Misspelled ingredients ("cinamon") are corrected, and the correction is printed first.
+**Find recipes from what you have** (`match.py`): lists recipes that use what you name, the ones using the most of it first, then the ones using the rarer of your ingredients (pumpkin before heavy cream), then the ones missing the least. A recipe has to use all of one or two ingredients, or two-thirds of a longer list; if none do, it says so and shows the closest. Pantry staples (`word_lists/universal/pantry_staples.json`) are assumed on hand, and don't count toward how much of your list a recipe uses. A recipe that calls for another of the book's recipes (a crust, a curd, a sauce) counts it as on hand if you have it, have a general form of it ("pie crust" for a specific pie dough), or can make it from what you have. Misspelled ingredients ("cinamon") are corrected, and the correction is printed first.
 
 ```
 python3 match.py "pecans, cream cheese, lemons"
@@ -181,7 +181,6 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.1.3:** find the right recipe: "butter cream" finds Buttercream, say when a recipe was found through its variation, show a recipe named in part ("the extra-thick one"), answer a question that names a recipe instead of showing it, see results past the first 15, and better ordering when results tie
 - **1.2.0:** filter a list by an ingredient, search by flavor, search by dish and ingredient together (including listing every recipe of a dish, not just the closest titles)
 - **1.3.0:** show chat replies word by word, lay recipes out more readably on the website
 - **1.4.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab), and answer general cooking questions ("what's the difference between baking soda and baking powder?")

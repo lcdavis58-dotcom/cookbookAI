@@ -35,6 +35,7 @@ ENTRIES = [
         ("Dessert Person", "Lemon Curd"),
         ("Momofuku Milk Bar", "Chocolate Cake"),
         ("Book X", "Double Chocolate Cake"),
+        ("The Book On Pie", "Extra-Thick and Creamy Whipped Cream"),
     ])
 ]
 CANDIDATES = candidates_from_index(ENTRIES)
@@ -120,11 +121,11 @@ class RulesTest(unittest.TestCase):
     def test_sentences_with_commas_and_half_and_half_arent_rules(self):
         # Were "rule: match list" (her sentence kept as two ingredients)
         # and "rule: reply need recipe" (half and half read as halving).
-        for message, make_state in [("i don't like this one, show me the one from dessert person", on_recipe),
-                                    ("do any of these use half and half", after_match)]:
-            with self.subTest(message=message):
-                result, called_model = route(make_state(), message)
-                self.assertTrue(called_model, result.label)
+        # The first is now the "from <book>" rule (1.1.3).
+        result, _ = route(on_recipe(), "i don't like this one, show me the one from dessert person")
+        self.assertEqual(result.label, "rule: reply from book, none")
+        result, called_model = route(after_match(), "do any of these use half and half")
+        self.assertTrue(called_model, result.label)
 
     def test_cases(self):
         for message, make_state, expected in self.CASES:
@@ -236,7 +237,78 @@ class ModelRouteTest(unittest.TestCase):
         self.assertIn("Last ingredients searched: pecan, lemon", summary)
 
 
+class FindTheRightRecipeTest(unittest.TestCase):
+    """1.1.3: another recipe of the current dish, by a word of its name
+    or by its book; the rest of a long list; a question naming recipes."""
+
+    def test_the_x_one(self):
+        result, called_model = route(on_recipe(), "what about the extra-thick one")
+        self.assertEqual((result.label, result.recipe.title),
+                         ("rule: ask other one", "Extra-Thick and Creamy Whipped Cream"))
+        self.assertFalse(called_model)
+
+    def test_the_one_from_a_book(self):
+        result, _ = route(on_recipe(), "no, show me the one from cooking for two")
+        self.assertEqual((result.label, result.recipe.title), ("rule: ask from book", "Whipped Cream"))
+        result, _ = route(on_recipe(), "show me the one from dessert person instead")
+        self.assertEqual(result.label, "rule: reply from book, none")
+        self.assertIn("Dessert Person doesn't have a whipped cream recipe", result.text)
+        result, _ = route(on_recipe("Lemon Curd", factor=None), "show me the one from dessert person")
+        self.assertEqual((result.label, result.text),
+                         ("rule: reply from book, this one", "Lemon Curd is the one from Dessert Person."))
+
+    def test_the_from_book_rule_leaves_a_named_dish_alone(self):
+        result, _ = route(on_recipe(), "show me the lemon curd from dessert person")
+        self.assertEqual(result.label, "rule: ask find")
+        result, _ = route(on_recipe(), "show me my chocolate cake recipe from milk bar")
+        self.assertNotIn("from book", result.label)
+
+    def test_more_of_a_which_one_list(self):
+        state = picking("ask", "show me a whipped cream")
+        state.focus.numbered.rest = [ref("Chocolate Whipped Cream")]
+        result, _ = route(state, "show me more")
+        self.assertEqual((result.label, [c.title for c in result.choices], result.first),
+                         ("rule: ask more", ["Chocolate Whipped Cream"], 3))
+        state.focus.numbered.rest = []
+        self.assertEqual(route(state, "more")[0].label, "rule: reply no more")
+
+    def test_more_match_results(self):
+        result, _ = route(after_match(), "more")
+        self.assertEqual((result.label, result.request, result.page, result.first),
+                         ("rule: match more, page 2", "pecan, lemon", 1, 2))
+
+    def test_a_more_turn_numbers_on(self):
+        state = picking("ask", "show me a whipped cream")
+        state.focus.numbered.rest = [ref("Chocolate Whipped Cream"), ref("Lemon Curd")]
+        with mock.patch.object(router, "load_candidates", return_value=CANDIDATES):
+            result = turn.respond(state, "more", CANDIDATES)
+        self.assertIn("  3. Chocolate Whipped Cream", result.text)
+        self.assertIn("  4. Lemon Curd", result.text)
+        self.assertEqual([r.title for r in state.focus.numbered.items][2:], ["Chocolate Whipped Cream", "Lemon Curd"])
+        self.assertEqual(state.focus.numbered.rest, [])
+        self.assertEqual(state.focus.pending.kind, "pick_recipe")
+
+    def test_a_question_naming_recipes_is_answered(self):
+        result, called_model = route(fresh(), "how long does whipped cream keep in the fridge?")
+        self.assertEqual(result.label, "rule: ask question about named")
+        self.assertFalse(called_model)
+
+
 class ReplyAndTurnTest(unittest.TestCase):
+    def test_later_pages_of_match_results_number_on(self):
+        def found(title):
+            return {"entry": {"title": title, "book": "B", "page": 0, "page_confirmed": False},
+                    "uses": ["lemon"], "missing": [], "staples_used": [], "optional_on_hand": []}
+        results = [found(f"R{i}") for i in range(1, 21)]
+        first = MatchResult("matches", have=["lemon"], ready=results)
+        self.assertIn('...and 5 more. Say "more" to see them.', reply.match_reply(first))
+        second = MatchResult("matches", have=["lemon"], ready=results, page=1, first_number=16)
+        text = reply.match_reply(second)
+        self.assertIn("You can make (20), continued:", text)
+        self.assertIn("  16. R16  [B]", text)
+        self.assertNotIn("R15  [B]", text)
+        third = MatchResult("matches", have=["lemon"], ready=results, page=2, first_number=21)
+        self.assertIn("That's all of them.", reply.match_reply(third))
     def test_match_results_are_numbered_across_sections(self):
         def found(title):
             return {"entry": {"title": title, "book": "B", "page": 0, "page_confirmed": False},

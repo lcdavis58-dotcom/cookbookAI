@@ -32,6 +32,9 @@ TITLE_ALIASES = {"Béchamel Sauce, 11 Ways": ["Béchamel"]}
 # Nothing marks a step in the text; the list ends at the blank line
 # ingest puts before the method (ingredient_end).
 STEP_RE = re.compile(r"(?!)")
+# A variation is a paragraph opening with its name and a period ("Greek
+# Salad. The classic, simplified: ...").
+VARIATION_NAME_RE = re.compile(r"^([A-Z][^.:\n]{1,80}?)\.(?:\s|$)")
 
 _BODY_MIN, _BODY_MAX = 14.5, 15.5
 

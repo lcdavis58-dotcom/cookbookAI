@@ -84,5 +84,49 @@ class TitleAliasesTest(unittest.TestCase):
         self.assertEqual(self.profile().title_aliases("Ways to Use Leftovers"), [])
 
 
+class VariationNamesTest(unittest.TestCase):
+    """Variation names after a VARIATIONS heading (made-up recipes)."""
+
+    def names(self, text, **settings):
+        module = types.ModuleType("test_book")
+        module.INGREDIENT_STYLE = "metric_slash"
+        for name, value in settings.items():
+            setattr(module, name, value)
+        return Profile(module).variation_names(text)
+
+    def test_name_colon(self):
+        text = ("Plum Jam\nMakes 2 cups\n1 pound plums\nCook it down.\nVARIATIONS\n"
+                "Spiced Plum Jam: Add a cinnamon stick with the\nplums. Remove it before jarring.\n"
+                "Mint: Stir in mint at the end.\n"
+                "Mix the jam by hand: Use a wooden spoon.\n"
+                "Ginger-Plum Jam: Add ginger.\n")
+        # "Mint" is only a change, "Mix the jam by hand" an instruction.
+        self.assertEqual(self.names(text), ["Spiced Plum Jam", "Ginger-Plum Jam"])
+
+    def test_a_wrapped_line_isnt_a_name(self):
+        text = ("Toast\nVariations\nGarlic Toast: Rub with garlic, then\nButtered Crumbs. Done.\n")
+        self.assertEqual(self.names(text), ["Garlic Toast"])
+
+    def test_no_heading_no_names(self):
+        self.assertEqual(self.names("Toast\nGarlic Toast: Rub with garlic.\n"), [])
+        self.assertEqual(self.names("Toast\nVariations\nGarlic Toast: Rub.\n", VARIATIONS_HEADING_RE=None), [])
+
+    def test_book_patterns(self):
+        # Name and a period (HTCEV); a name on its own line (Cooking For
+        # Two), skipping how-to sidebars; capitals then the method
+        # (Savory Baking); a bullet naming the dish (Salt Fat Acid Heat).
+        from books import cooking_for_two, htcev, salt_fat_acid_heat, savory_baking
+        self.assertEqual(self.names("Bean Salad\nVariations\nWhite Bean Salad. Use white beans.\n",
+                                    VARIATION_NAME_RE=htcev.VARIATION_NAME_RE), ["White Bean Salad"])
+        self.assertEqual(self.names("Lentil Stew\nVARIATIONS\nSmoky Lentil Stew\nAdd paprika.\n"
+                                    "Preparing Lentils\nRinse them.\nSTORING LENTILS\nKeep them dry.\n",
+                                    VARIATION_NAME_RE=cooking_for_two.VARIATION_NAME_RE),
+                         ["Smoky Lentil Stew"])
+        self.assertEqual(self.names("Corn Muffins\nVariations\nHONEY CORN MUFFINS Add honey.\n",
+                                    VARIATION_NAME_RE=savory_baking.VARIATION_NAME_RE), ["HONEY CORN MUFFINS"])
+        self.assertEqual(self.names("Herb Salsa\nVariations\n• To make Mint Salsa , use mint.\n",
+                                    VARIATION_NAME_RE=salt_fat_acid_heat.VARIATION_NAME_RE), ["Mint Salsa"])
+
+
 if __name__ == "__main__":
     unittest.main()

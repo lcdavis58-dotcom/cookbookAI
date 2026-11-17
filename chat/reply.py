@@ -11,10 +11,13 @@ from actions import ask, match, scale
 PICK_HINT = "Type a number, or part of the recipe's name or book."
 
 
-def _numbered(choices, more):
-    lines = [f"  {i}. {c.title}  ({c.book})" for i, c in enumerate(choices, 1)]
+MORE_HINT = 'Say "more" to see them.'
+
+
+def _numbered(choices, more, label=lambda c: c.title, start=1):
+    lines = [f"  {i}. {label(c)}  ({c.book})" for i, c in enumerate(choices, start)]
     if more:
-        lines.append(f"  ...and {more} more. Add more of the name to narrow it down.")
+        lines.append(f"  ...and {more} more. {MORE_HINT} Or add more of the name to narrow it down.")
     return lines
 
 
@@ -22,11 +25,15 @@ def ask_reply(result):
     lines = [f"{w}\n" for w in result.warnings]
     if result.kind == "recipe":
         c = result.recipe
+        lines += [f"{line}\n" for line in (result.note, ask.variation_note(result)) if line]
         lines += [f"{c.title}, from {c.book} ({ask.page_note(c)}):\n", result.text]
     elif result.kind == "choices":
         total = len(result.choices) + result.more
-        lines += [(result.heading or f"I found {total} recipes for that. Which one?") + "\n",
-                  *_numbered(result.choices, result.more),
+        heading = result.heading or f"I found {total} recipes for that. Which one?"
+        if result.start > 1:
+            heading = "More of them:"
+        lines += [heading + "\n",
+                  *_numbered(result.choices, result.more, lambda c: ask.choice_label(result, c), result.start),
                   f"\n{PICK_HINT}"]
     elif result.kind == "answer":
         sources = []
@@ -61,25 +68,26 @@ def match_reply(result):
     lines = [match.describe_typos(result.corrections)] if result.corrections else []
     lines.append(f"You have: {', '.join(result.have)}  (plus pantry staples)")
     lines += [f"  ({note})" for note in result.assumptions]
-    if result.only_partial:
+    if result.only_partial and not result.page:
         lines.append(f"\n{match.ONLY_PARTIAL}")
-    number = 0
-    for heading, results in (("You can make", result.ready),
-                             ("You can make, with a sub-recipe from scratch", result.from_scratch),
-                             ("Missing some ingredients", result.missing_some)):
-        if not results:
+    number = result.first_number - 1
+    for heading, name in match.SECTIONS:
+        results = getattr(result, name)
+        shown = match.section_page(result, results)
+        if not shown:
             continue
-        lines.append(f"\n{heading} ({len(results)}):")
-        for r in results[:match.SHOW_PER_SECTION]:
+        lines.append(f"\n{heading} ({len(results)}){', continued' if result.page else ''}:")
+        for r in shown:
             number += 1
             entry_lines = match.describe(r)
             entry_lines[0] = f"  {number}. {entry_lines[0].lstrip()}"
             lines += entry_lines
-        if len(results) > match.SHOW_PER_SECTION:
-            lines.append(f"  ...and {len(results) - match.SHOW_PER_SECTION} more")
-    if not number:
-        lines.append("\nI couldn't find any recipes that use those.")
-    if number:
+        left = match.left_after(result, results)
+        if left:
+            lines.append(f"  ...and {left} more. {MORE_HINT}")
+    if number < result.first_number:
+        lines.append("\nThat's all of them." if result.page else "\nI couldn't find any recipes that use those.")
+    else:
         lines.append('\nTo see a recipe, type its number. To change your search, type "add" or "without" '
                      'and an ingredient, like "add lemons."')
     return "\n".join(lines)

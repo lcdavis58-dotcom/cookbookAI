@@ -13,6 +13,9 @@ Entry shape:
     match_title   the title without a "with ..." tail, and
     aliases       extra titles from the book's TITLE_ALIASES, both for
                   title lookup (query_utils/title_lookup.py)
+    variations    the names of the variations printed after the recipe
+                  ("Brown Butter Cream Cheese Frosting"), display-cased,
+                  so title lookup can find a recipe by one and say so
     page, page_confirmed,
     ingredients   required ingredients, each {"name": the normalized
                   name, for display ("unsalted butter or shortening"),
@@ -119,6 +122,7 @@ def index_entry(recipe_id, recipe):
         "title": display_title(printed_title or recipe_id),
         "match_title": extract_title(text, book, include_subtitle=False) or "",
         "aliases": profile_for_book(book).title_aliases(printed_title),
+        "variations": [display_title(name) for name in profile_for_book(book).variation_names(text)],
         "page": recipe["page"],
         "page_confirmed": recipe["page_confirmed"],
         "ingredients": required,
@@ -200,4 +204,6 @@ def summarize(entries):
                      + ", ".join(no_ingredients[:8]) + (", ..." if len(no_ingredients) > 8 else ""))
     choices = sum(1 for e in entries for i in e["ingredients"] + e["optional"] if len(i["options"]) > 1)
     lines.append(f"  {choices} ingredient choices (\"X or Y\") split into options")
+    variations = sum(len(e.get("variations", [])) for e in entries)
+    lines.append(f"  {variations} variations named, in {sum(1 for e in entries if e.get('variations'))} recipes")
     return lines

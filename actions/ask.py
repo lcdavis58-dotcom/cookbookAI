@@ -2,6 +2,12 @@
 Ask a question about your recipes: a recipe the question names is shown
 as the book's exact text; several are listed to pick from; anything else
 goes to the model with the closest book excerpts. See query.py.
+
+A question that names recipes ("what can I substitute for buttermilk in
+pancakes?") is answered from those recipes' text rather than showing
+them. A request to see a recipe that names none in full gets the one
+plainly closest title, or the titles with all its words ("my butter
+cream recipe from dessert person"), before a "Did you mean" list.
 """
 
 import re
@@ -10,7 +16,7 @@ from dataclasses import dataclass, field
 from common import cli, models
 from query_utils.recipe_matching import extract_title, semantic_top_recipe_guess
 from query_utils.retrieval import candidate_text, retrieve, within_distance
-from query_utils.title_lookup import find_recipes, list_titles, load_candidates
+from query_utils.title_lookup import MAX_LISTED, find_recipes, list_titles, load_candidates
 
 DID_YOU_MEAN = "I couldn't find a recipe by exactly that name. Did you mean one of these?"
 # Asking to see a recipe, as opposed to asking about something. "Show me
@@ -19,7 +25,23 @@ WANTS_RECIPE_RE = re.compile(r"^\s*(?:(?:no|ok(?:ay)?|actually|and|so|please)[,\
                              r"(?:show\s+me(?!\s+how\b)|(?:a\s+|the\s+)?recipe\s+for|"
                              r"how\s+(?:do|would|should|can)\s+i\s+make|how\s+to\s+make|find(?:\s+me)?|give\s+me|"
                              r"pull\s+up|open|let\s+me\s+see|can\s+i\s+see|i\s+want\s+to\s+make|"
-                             r"i'?d\s+like\s+to\s+make|look\s+up)\b", re.I)
+                             r"i'?d\s+like\s+to\s+make|look\s+up|is\s+there|are\s+there|"
+                             r"do\s+(?:i|we|you)\s+have|where(?:'?s|\s+is))\b", re.I)
+# A question, as opposed to a request ("show me ..."); see run().
+QUESTION_RE = re.compile(r"^\s*(how|what|when|why|where|which|who|can|could|should|do|does|did|is|are|"
+                         r"will|would)\b|\?\s*$", re.I)
+# What a question about a recipe tends to ask. A question naming a
+# recipe without any of these ("what goes with banana bread?") isn't
+# answered from that recipe alone.
+DETAIL_RE = re.compile(r"\b(bake|baking|chill|chilling|cook|cooking|rest|rise|proof|temperature|oven|degrees|"
+                       r"how long|minutes|hours|time|ahead|store|keep|last|freeze|thaw|substitute|instead of|swap|"
+                       r"replace|pan|serve|yield|makes|step|steps|ingredients?|need|calls? for|use|uses|"
+                       r"how much|how many)\b", re.I)
+CLOSEST = "I couldn't find a recipe by exactly that name. This is the closest:"
+CLOSEST_SEVERAL = "I couldn't find a recipe by exactly that name. These have all of its words:"
+# How many recipes a question naming several is answered from: whole
+# recipes are long, and the model's context holds about three.
+ABOUT_MAX_RECIPES = 3
 
 # How many of the retrieved chunks get pasted into the prompt if we fall
 # through to generation. Kept small, a bigger prompt directly costs more
@@ -83,6 +105,10 @@ class AskResult:
     generation_time: float = 0.0
     warnings: list = field(default_factory=list)
     heading: str = ""               # for "choices", when it isn't the usual "which one?"
+    note: str = ""                  # for "recipe": said first ("the closest I found")
+    rest: list = field(default_factory=list)  # for "choices": the ones past those shown, for "more"
+    start: int = 1                  # for "choices": the number of the first one (a later page)
+    via: dict = field(default_factory=dict)   # recipe key -> the variation it was found through
 
 
 def build_context(hits):
@@ -107,14 +133,8 @@ def run(question):
     hits = retrieve(question)
     relevant = within_distance(hits)
     found, source = find_recipes(question, hits)
-    # Only a title the question names in full is shown directly. A near
-    # miss ("partial") is offered if the recipe is what's being asked for.
-    # Otherwise it goes to the model with the closest chunks, since a
-    # question can mention a dish in passing ("what goes with banana
-    # bread?") without asking for that recipe.
-    header_matches = found.matches if found.kind == "match" else []
-    if found.kind == "partial" and WANTS_RECIPE_RE.search(question):
-        return AskResult("choices", question, choices=found.matches, more=found.more, heading=DID_YOU_MEAN)
+    wants = bool(WANTS_RECIPE_RE.search(question))
+    asking = not wants and bool(QUESTION_RE.search(question)) and bool(DETAIL_RE.search(question))
 
     # Diagnostic comparison, not used for the actual decision below.
     # Prints what a pure-embedding-distance approach would have guessed,
@@ -126,18 +146,34 @@ def run(question):
                           if semantic_guess else "(too close to call)")
         print(f"[debug] semantic-only guess: {semantic_title}  |  title lookup in the {source}: "
               f"{found.kind} {[c.title for c in found.matches] or ''}, typos read as {found.typos or '(none)'}, "
-              f"books named: {found.books or '(none)'}")
+              f"books named: {found.books or '(none)'}, via variations: {found.via or '(none)'}")
+
+    # Only a title the question names in full is shown directly; a
+    # question naming one is answered from it. A near miss ("partial")
+    # is offered if the recipe is what's being asked for. Otherwise it
+    # goes to the model with the closest chunks, since a question can
+    # mention a dish in passing ("what goes with banana bread?") without
+    # naming a recipe.
+    header_matches = found.matches if found.kind == "match" else []
+    if header_matches and asking:
+        return about_several(header_matches, question)
 
     warnings = []
     if len(header_matches) == 1:
         c = header_matches[0]
         text = candidate_text(c)
         if text:
-            return AskResult("recipe", question, recipe=c, text=text)
+            return AskResult("recipe", question, recipe=c, text=text, via=found.via)
         warnings.append(_stale(c))
 
     if len(header_matches) > 1:
-        return AskResult("choices", question, choices=header_matches, more=found.more)
+        return AskResult("choices", question, choices=header_matches, more=found.more, via=found.via,
+                         rest=found.rest)
+
+    if wants and not header_matches:
+        closest = _closest(question, found)
+        if closest is not None:
+            return closest
 
     # No direct recipe title match, fall through to the LLM for passing
     # mentions, "similar to" style questions, or content_type="unknown"
@@ -156,6 +192,39 @@ def run(question):
     answer, seconds = _answer(user_prompt)
     return AskResult("answer", question, answer=answer, sources=llm_hits,
                      generation_time=seconds, warnings=warnings)
+
+
+def _closest(question, found):
+    """For a request to see a recipe that names none in full: the one
+    plainly closest title, else the titles with all of its words (in
+    the book it names), else the near misses to pick from; None if there
+    are none."""
+    if found.kind == "partial" and found.clear is not None:
+        shown = show(found.clear, question)
+        if shown.kind == "recipe":
+            shown.note, shown.via = CLOSEST, found.via
+        return shown
+    candidates, _ = load_candidates([])
+    listed = list_titles(question, question, candidates)
+    if len(listed) == 1:
+        shown = show(listed[0], question)
+        if shown.kind == "recipe":
+            shown.note = CLOSEST
+        return shown
+    if listed:
+        return AskResult("choices", question, choices=listed[:MAX_LISTED], more=len(listed[MAX_LISTED:]),
+                         heading=CLOSEST_SEVERAL, rest=listed[MAX_LISTED:])
+    if found.kind == "partial":
+        return AskResult("choices", question, choices=found.matches, more=found.more, heading=DID_YOU_MEAN,
+                         via=found.via, rest=found.rest)
+    return None
+
+
+def more(rest, start):
+    """The next MAX_LISTED of a "which one?" list (rest: the Candidates
+    not shown yet), numbered from start."""
+    return AskResult("choices", "more", choices=rest[:MAX_LISTED], more=len(rest[MAX_LISTED:]),
+                     rest=rest[MAX_LISTED:], start=start)
 
 
 def list_recipes(what, question):
@@ -197,16 +266,44 @@ def show(candidate, question=""):
 def about(candidate, question):
     """A question about one recipe ("how long does it chill?"),
     answered by the model from that recipe's text alone."""
-    text = candidate_text(candidate)
-    if not text:
-        return AskResult("nothing", question, warnings=[_stale(candidate)])
-    entry = candidate.payload or {}
-    source = {"book": candidate.book, "page": entry.get("page", 0),
-              "page_confirmed": entry.get("page_confirmed", False), "distance": 0.0, "text": text}
-    answer, seconds = _answer(f"Cookbook excerpts:\n\n{build_context([source])}\n\n"
-                              f"Question (about {candidate.title}): {question}")
-    return AskResult("answer", question, recipe=candidate, answer=answer, sources=[source],
-                     generation_time=seconds)
+    return about_several([candidate], question)
+
+
+def about_several(candidates, question):
+    """A question about the recipes it names, answered by the model from
+    the text of the first ABOUT_MAX_RECIPES of them ("how long does
+    whipped cream keep?" names every whipped cream). With one recipe,
+    the result's recipe is that one."""
+    sources, warnings = [], []
+    for candidate in candidates[:ABOUT_MAX_RECIPES]:
+        text = candidate_text(candidate)
+        if not text:
+            warnings.append(_stale(candidate))
+            continue
+        entry = candidate.payload or {}
+        sources.append({"book": candidate.book, "page": entry.get("page", 0),
+                        "page_confirmed": entry.get("page_confirmed", False), "distance": 0.0, "text": text})
+    if not sources:
+        return AskResult("nothing", question, warnings=warnings)
+    about_what = " / ".join(c.title for c in candidates[:ABOUT_MAX_RECIPES])
+    answer, seconds = _answer(f"Cookbook excerpts:\n\n{build_context(sources)}\n\n"
+                              f"Question (about {about_what}): {question}")
+    return AskResult("answer", question, recipe=candidates[0] if len(candidates) == 1 else None,
+                     answer=answer, sources=sources, generation_time=seconds, warnings=warnings)
+
+
+def variation_note(result):
+    """"X is a variation of Y" for a recipe found through one of its
+    variations, else ""."""
+    c = result.recipe
+    name = result.via.get(c.key) if c is not None else None
+    return f"{name} is a variation of {c.title}; it's near the end." if name else ""
+
+
+def choice_label(result, candidate):
+    """A listed recipe's title, plus the variation it was listed for."""
+    name = result.via.get(candidate.key)
+    return f"{candidate.title} (its {name} variation)" if name else candidate.title
 
 
 def render(result):
@@ -214,6 +311,7 @@ def render(result):
     lines = [f"{w}\n" for w in result.warnings]
     if result.kind == "recipe":
         c = result.recipe
+        lines += [f"{line}\n" for line in (result.note, variation_note(result)) if line]
         lines += [f"Found this directly in {c.book} ({page_note(c)}), showing the exact text:\n",
                   result.text,
                   "\n(matched instantly, no generation needed)"]
@@ -222,7 +320,8 @@ def render(result):
         total = len(choices) + result.more
         lines.append((result.heading or f"I found {total} recipes matching \"{result.question}\". "
                                          "Which one did you mean?") + "\n")
-        lines += [f"  {i}. {c.title}  ({c.book}, {page_note(c)})" for i, c in enumerate(choices, 1)]
+        lines += [f"  {i}. {choice_label(result, c)}  ({c.book}, {page_note(c)})"
+                  for i, c in enumerate(choices, 1)]
         if result.more:
             lines.append(f"  ...and {result.more} more.")
         first = choices[0]
