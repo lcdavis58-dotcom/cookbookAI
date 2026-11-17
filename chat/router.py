@@ -31,6 +31,7 @@ import os
 import re
 from dataclasses import dataclass
 
+from actions.ask import DETAIL_RE, QUESTION_RE
 from actions.scale import find_batch, times, without_title_multipliers
 from books import strategy_for
 from chat.state import Pending, resolve
@@ -39,8 +40,8 @@ from common.config import RECIPE_INDEX_PATH
 from match_utils.matching import parse_have
 from match_utils.recipe_index import load_index
 from query_utils.retrieval import candidate_text
-from query_utils.title_lookup import (REQUEST_WORDS, candidates_from_index, find_books, lookup,
-                                      title_tokens, word_forms)
+from query_utils.title_lookup import (ASKING_WORDS, MAX_LISTED, REQUEST_WORDS, candidates_from_index, find_books,
+                                      list_titles, lookup, title_tokens, word_forms)
 from scale_utils.ingredients import extract_ingredient_groups
 from scale_utils.pan_scaling import detect_pan_request
 from scale_utils.recipe_scaling import detect_direct_multiplier
@@ -55,11 +56,22 @@ NUMBER_RE = re.compile(r"(?:^|\s)(?:#\s*|no\.\s*|number\s+|option\s+|recipe\s+#?
 BARE_NUMBER_RE = re.compile(r"^\s*#?(\d{1,2})\s*[.!)]?\s*$")
 
 PRONOUN_RE = re.compile(r"\b(it|that|this|them|these|those|same|the recipe|that recipe|this recipe)\b", re.I)
+# The next part of a long list: "more", "show me more", "the rest".
+MORE_RE = re.compile(r"^\s*(?:(?:ok(?:ay)?|and|so)[,\s]+)?(?:(?:show|give|let)\s+(?:me\s+)?(?:see\s+)?)?"
+                     r"(?:the\s+)?(?:more|rest|next(?:\s+(?:ones?|page|\d+))?)(?:\s+(?:of\s+(?:them|those|the\s+list)|"
+                     r"ones|results|recipes|please))*\s*[.!?]?\s*$", re.I)
+# Another recipe of the current dish, by a word of its name: "what about
+# the extra-thick one", "the chocolate version".
+OTHER_ONE_RE = re.compile(r"\b(?:the|that)\s+([\w'’\- ]+?)\s+(?:one|version|kind)\b", re.I)
+# The current dish from another book: "show me the one from dessert person".
+FROM_BOOK_RE = re.compile(r"\b(?:one|version|recipe|it|that|this|theirs|hers|his)\b", re.I)
+# Words that, beside a book's name, don't name a dish ("no, show me the
+# one from dessert person instead").
+NOT_A_DISH = frozenset("""no not ok okay actually what about how version versions kind instead rather there
+    their theirs hers his her him book cookbook""".split())
 # Back to what the recipe calls for.
 ORIGINAL_RE = re.compile(r"\b(original|as written|recipe'?s (?:own )?amounts|back to normal|normal amounts?|"
                          r"regular amounts?|unscaled|full recipe)\b", re.I)
-QUESTION_RE = re.compile(r"^\s*(how|what|when|why|where|which|who|can|could|should|do|does|did|is|are|"
-                         r"will|would)\b|\?\s*$", re.I)
 SCALE_CUE_RE = re.compile(r"\b(scale|scaled|rescale|for \d+|feeds?|serves?|servings?|people|guests|"
                           r"enough for|crowd of \d+|for a crowd|"
                           r"only have|only got|have only|i just have|i have just|make (?:it|this|that) for)\b", re.I)
@@ -74,10 +86,6 @@ SOUNDS_LIKE_SCALING_RE = re.compile(r"\d|%|\b(bigger|smaller|larger|more|less|fe
                                     r"quadruple|twice|thrice|scale|size|batch|serv|people|guests|feed|crowd|pan|"
                                     r"amount|portion|original|written|enough|times|two|three|four|five|six|"
                                     r"seven|eight|nine|ten|twelve|dozen)", re.I)
-# What a question about the recipe at hand tends to ask.
-DETAIL_RE = re.compile(r"\b(bake|baking|chill|chilling|cook|cooking|rest|rise|proof|temperature|oven|degrees|"
-                       r"how long|minutes|hours|time|ahead|store|keep|freeze|thaw|substitute|instead of|swap|"
-                       r"replace|pan|serve|yield|makes|step|steps|ingredients?|need|calls? for)\b", re.I)
 ASK_RE = re.compile(r"^\s*(?:show\s+me|(?:a\s+|the\s+)?recipe\s+for|how\s+(?:do|would|should|can)\s+i\s+make|"
                     r"how\s+to\s+make|find(?:\s+me)?|give\s+me|pull\s+up|open|let\s+me\s+see|can\s+i\s+see|"
                     r"i\s+want\s+to\s+make|i'?d\s+like\s+to\s+make|look\s+up)\b", re.I)
@@ -122,9 +130,12 @@ class Route:
                 wait on pending if given)
         mode    ask: "find" (look up find_text), "show" (recipe),
                 "about" (a question about recipe), "list" (every recipe
-                with find_text in its title)
+                with find_text in its title), "choose" (offer choices,
+                under text), "more" (the next part of a "which one?"
+                list: choices, numbered from first)
                 scale: "find" (look up find_text, then scale), "recipe"
-                match: "run"
+                match: "run" (page: which part of the results, numbered
+                from first)
     request is what the action is asked (the scaling request, the
     question, the ingredient list); remember_as is the request a result
     is remembered under when it finishes an earlier one."""
@@ -142,6 +153,9 @@ class Route:
     explanation: str = None
     text: str = ""
     pending: Pending = None
+    choices: list = None            # title_lookup.Candidate, for "choose" and "more"
+    page: int = 0
+    first: int = 1
 
     @property
     def label(self):
@@ -241,6 +255,13 @@ def mostly_title(message, candidate):
     for w in title_tokens(candidate.title):
         title |= word_forms(w)
     return bool(words) and 2 * sum(1 for w in words if word_forms(w) & title) >= len(words)
+
+
+def dish_words(candidate):
+    """The words naming a recipe's dish: its title without the "with ..."
+    tail and words like "classic" ("whipped cream" for "Classic Whipped
+    Cream")."""
+    return list(candidate.variants[0][0]) if candidate.variants else title_tokens(candidate.title)
 
 
 def is_question(message):
@@ -369,6 +390,15 @@ class Router:
             if m:
                 return Route("ask", "rule", "list", mode="list", find_text=m.group(1), request=message)
 
+        more = self.more_rule(message)
+        if more:
+            return more
+
+        if current and named.kind != "match" and not scale_cues(message):
+            other = self.from_book_rule(message, current) or self.other_one_rule(message, current)
+            if other:
+                return other
+
         if current and focus.scale and ORIGINAL_RE.search(message) and not named_one \
                 and detect_direct_multiplier(message) is None and not is_question(message):
             return self.scale_route("rule", current, message, "current")
@@ -414,6 +444,12 @@ class Router:
         if named.kind == "match" and not is_question(message) and mostly_title(message, named.matches[0]):
             return Route("ask", "rule", "find", mode="find", find_text=message, request=message)
 
+        # A question about recipes it names, not pointing at one ("how
+        # long does whipped cream keep?"): answered from them (ask.run).
+        if named.kind == "match" and is_question(message) and DETAIL_RE.search(message) \
+                and not PRONOUN_RE.search(message):
+            return Route("ask", "rule", "question about named", mode="find", find_text=message, request=message)
+
         # A question about the recipe at hand: "how long does it chill?",
         # "what temperature?". One that names another dish, even in part,
         # or doesn't sound like it's about a recipe ("what's for
@@ -423,6 +459,77 @@ class Router:
                 or (named.kind == "none" and DETAIL_RE.search(message))):
             return Route("ask", "rule", "about current", mode="about", recipe=current, request=message)
         return None
+
+    def more_rule(self, message):
+        """"more": the next page of the last match results, or the next
+        part of the last "which one?" list, numbered on from it."""
+        numbered = self.focus.numbered
+        if not MORE_RE.match(message) or numbered is None:
+            return None
+        first = len(numbered.items) + 1
+        if numbered.source == "match":
+            if not self.focus.have:
+                return None
+            return Route("match", "rule", f"more, page {numbered.pages + 1}", mode="run",
+                         request=", ".join(self.focus.have), page=numbered.pages, first=first)
+        rest = [c for c in (self.resolve(r) for r in numbered.rest if not r.gone) if c]
+        if not rest:
+            return Route("reply", "rule", "no more", text="That was the whole list.")
+        return Route("ask", "rule", "more", mode="more", choices=rest, first=first)
+
+    def show_or_choose(self, found, detail, message, heading):
+        """Show the one recipe found, or offer several (at most MAX_LISTED)."""
+        if len(found) == 1:
+            return Route("ask", "rule", detail, mode="show", recipe=found[0], request=message)
+        if 1 < len(found) <= MAX_LISTED:
+            return Route("ask", "rule", f"{detail}, several", mode="choose", choices=found, request=message,
+                         text=heading)
+        return None
+
+    def from_book_rule(self, message, current):
+        """"show me the one from dessert person": the current dish's
+        recipe in the book named. Leading words of the current title are
+        dropped until the book has one ("Chewy Chocolate Chip Cookies" ->
+        "Chocolate Chip Cookies"), keeping at least two."""
+        books, rest = find_books(message, {c.book for c in self.candidates})
+        # Only when the message names no dish of its own: "show me my
+        # butter cream recipe from dessert person" is about buttercream.
+        if not books or not FROM_BOOK_RE.search(message) or any(
+                not word_forms(w) & (ASKING_WORDS | NOT_INGREDIENT_WORDS | NOT_A_DISH) for w in title_tokens(rest)):
+            return None
+        in_books = [c for c in self.candidates if c.book in books and not same_recipe(c, current)]
+        words = dish_words(current)
+        for start in range(len(words)):
+            if start and len(words) - start < 2:
+                break
+            found = list_titles(" ".join(words[start:]), "", in_books)
+            if found:
+                where = " or ".join(books)
+                return self.show_or_choose(found, "from book", message,
+                                           f"{where} has {len(found)} recipes like that. Which one?")
+        if current.book in books:
+            return Route("reply", "rule", "from book, this one",
+                         text=f"{current.title} is the one from {current.book}.")
+        return Route("reply", "rule", "from book, none",
+                     text=f"{' or '.join(books)} doesn't have a {' '.join(words) or current.title} recipe "
+                          f"that I can find.")
+
+    def other_one_rule(self, message, current):
+        """"what about the extra-thick one": another recipe of the current
+        dish with those words in its title ("Extra-Thick and Creamy
+        Whipped Cream" after "Classic Whipped Cream"), or failing that,
+        any recipe with those words."""
+        m = OTHER_ONE_RE.search(message)
+        if not m:
+            return None
+        words = [w for w in title_tokens(m.group(1)) if w not in REQUEST_WORDS and w not in NOT_INGREDIENT_WORDS]
+        if not words:
+            return None
+        others = [c for c in self.candidates if not same_recipe(c, current)]
+        found = list_titles(" ".join(words + dish_words(current)), message, others)
+        if not found:
+            found = list_titles(" ".join(words), message, others)
+        return self.show_or_choose(found, "other one", message, "Which one do you mean?")
 
     def match_rule(self, message, named_one):
         have = self.focus.have

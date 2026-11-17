@@ -73,6 +73,15 @@ class FindMatchesTest(unittest.TestCase):
         results, _ = find_matches([entry("Plain", ["pecan", "salt", "pepper", "flour", "butter"])], ["pecan"])
         self.assertEqual(results[0]["missing"], [])
 
+    def test_rarer_ingredients_break_a_tie(self):
+        # 1.1.3: both use two of hers and the cream misses less, but far
+        # fewer recipes use pumpkin than heavy cream.
+        index = [entry("Cream", ["heavy cream", "cream cheese"]),
+                 entry("Pumpkin Pie", ["pumpkin", "cream cheese", "x", "y"]),
+                 entry("Ganache", ["heavy cream", "z"]), entry("Mousse", ["heavy cream", "z"])]
+        results, _ = find_matches(index, ["pumpkin", "cream cheese", "heavy cream"])
+        self.assertEqual(titles(results)[:2], ["Pumpkin Pie", "Cream"])
+
     def test_pumpkin_covers_puree_but_not_seeds(self):
         index = [entry("Pie", ["canned pumpkin puree"]), entry("Seeds", ["pumpkin seed"])]
         results, _ = find_matches(index, ["pumpkin"])
@@ -164,14 +173,43 @@ class LookupTest(unittest.TestCase):
 
 
 class AskPartialTest(unittest.TestCase):
-    def ask(self, question, kind="partial"):
-        found = mock.Mock(kind=kind, matches=CANDIDATES[:2], more=0, books=[PIE_BOOK], typos={})
+    def ask(self, question, kind="partial", clear=None, matches=CANDIDATES[:2], index=()):
+        found = mock.Mock(kind=kind, matches=list(matches), more=0, books=[PIE_BOOK], typos={}, clear=clear, via={})
         hits = [{"book": "Other Book", "page": 0, "page_confirmed": False, "text": "x", "distance": 0.1}]
         with mock.patch("actions.ask.retrieve", return_value=hits), \
                 mock.patch("actions.ask.within_distance", return_value=hits), \
                 mock.patch("actions.ask.find_recipes", return_value=(found, "index")), \
+                mock.patch("actions.ask.load_candidates", return_value=(list(index), "index")), \
+                mock.patch("actions.ask.candidate_text", side_effect=lambda c: f"text of {c.title}"), \
                 mock.patch("actions.ask._answer", return_value=("from the model", 0.1)) as model:
             return ask.run(question), model
+
+    def test_one_plainly_closest_title_is_shown(self):
+        result, model = self.ask("show me the fudge pie", clear=CANDIDATES[1])
+        self.assertEqual((result.kind, result.recipe, result.note), ("recipe", CANDIDATES[1], ask.CLOSEST))
+        model.assert_not_called()
+
+    def test_titles_with_all_the_words_come_before_a_guess(self):
+        pumpkin = [c for c in CANDIDATES if c.title == "Pumpkin Pie"]
+        result, _ = self.ask("show me my pumpkin pie from the book on pie", kind="none", matches=[], index=pumpkin)
+        self.assertEqual((result.kind, result.recipe.title, result.note), ("recipe", "Pumpkin Pie", ask.CLOSEST))
+        result, _ = self.ask("show me my pumpkin pie", kind="none", matches=[], index=CANDIDATES)
+        self.assertEqual((result.kind, result.heading), ("choices", ask.CLOSEST_SEVERAL))
+
+    def test_a_question_naming_recipes_is_answered_from_them(self):
+        result, model = self.ask("how long does the fudge pie keep?", kind="match", matches=CANDIDATES[:1])
+        self.assertEqual((result.kind, result.recipe), ("answer", CANDIDATES[0]))
+        self.assertIn("text of", model.call_args[0][0])
+        result, model = self.ask("how long do these keep?", kind="match", matches=CANDIDATES[:5])
+        self.assertEqual(len(result.sources), ask.ABOUT_MAX_RECIPES)
+        self.assertIsNone(result.recipe)
+
+    def test_asking_to_see_a_named_recipe_still_shows_it(self):
+        for question in ("show me the fudge pie", "is there a fudge pie recipe?", "how do I make fudge pie?"):
+            with self.subTest(question):
+                result, model = self.ask(question, kind="match", matches=CANDIDATES[:1])
+                self.assertEqual(result.kind, "recipe")
+                model.assert_not_called()
 
     def test_asking_for_a_recipe_offers_titles_and_skips_the_model(self):
         for question in ("show me the fudge pie", "no show me the fudge pie", "recipe for fudge pie"):
@@ -197,6 +235,11 @@ class ListingTest(unittest.TestCase):
     def test_a_named_book_limits_it(self):
         found = list_titles("pumpkin", "my pumpkin recipes from the book on pie", CANDIDATES)
         self.assertEqual([c.title for c in found], ["Pumpkin Pie"])
+
+    def test_words_written_apart(self):
+        shelf = candidates_from_index([entry("Silky Chocolate Buttercream"), entry("Brown Butter Cake")])
+        found = list_titles("butter cream", "show me my butter cream recipe", shelf)
+        self.assertEqual([c.title for c in found], ["Silky Chocolate Buttercream"])
 
     def test_a_kind_is_included(self):
         self.assertEqual(len(list_titles("pie crust", "pie crust", CANDIDATES)), 4)

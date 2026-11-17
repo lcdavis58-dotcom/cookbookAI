@@ -96,6 +96,30 @@ class RememberTest(unittest.TestCase):
         self.assertEqual(len(titles), SHOW_PER_SECTION + 2)
         self.assertEqual(titles[-2:], ["S", "M"])
 
+    def test_a_later_page_of_match_results_is_added(self):
+        results = [matched(f"R{i}") for i in range(SHOW_PER_SECTION + 3)]
+        remember(self.state, "match", "lemons", MatchResult("matches", have=["lemon"], ready=results))
+        remember(self.state, "match", "lemons", MatchResult("matches", have=["lemon"], ready=results, page=1))
+        titles = [r.title for r in self.focus.numbered.items]
+        self.assertEqual(len(titles), SHOW_PER_SECTION + 3)
+        self.assertEqual(titles[-1], f"R{SHOW_PER_SECTION + 2}")
+        self.assertEqual(self.focus.numbered.pages, 2)
+
+    def test_choices_keep_the_rest_for_more(self):
+        result = AskResult("choices", "q", choices=[cand("A")], rest=[cand("B"), cand("C")])
+        remember(self.state, "ask", "show me a cake", result)
+        self.assertEqual([r.title for r in self.focus.numbered.rest], ["B", "C"])
+        remember(self.state, "ask", "", AskResult("choices", "more", choices=[cand("B")], rest=[cand("C")], start=2))
+        self.assertEqual([r.title for r in self.focus.numbered.items], ["A", "B"])
+        self.assertEqual([r.title for r in self.focus.numbered.rest], ["C"])
+        self.assertEqual(self.focus.pending.request, "show me a cake")
+
+    def test_a_chat_saved_before_more_still_opens(self):
+        data = ChatState.new().to_dict()
+        data["focus"]["numbered"] = {"source": "ask", "items": [{"recipe_id": "x", "book": "B", "title": "T"}]}
+        numbered = ChatState.from_dict(data).focus.numbered
+        self.assertEqual((numbered.rest, numbered.pages), ([], 1))
+
     def test_a_miss_keeps_the_focus(self):
         remember(self.state, "ask", "recipe for curd", AskResult("recipe", "q", recipe=cand("Curd")))
         self.focus.pending = Pending("pick_batch", "scale", "double it", ["Small"])

@@ -99,7 +99,9 @@ class RoutingTest(unittest.TestCase):
         self.check("i've got strawberries, rhubarb and some cream, ideas?", "match", has=("strawberr", "rhubarb"))
 
     def test_question(self):
-        self.check("how long does whipped cream keep in the fridge", "ask")
+        # "how long does whipped cream keep in the fridge" is a rule since
+        # 1.1.3 (a question about recipes it names).
+        self.check("what goes well with pumpkin pie?", "ask")
 
     @unittest.skip("known gap, planned for 1.4.0: the model asks her what she means instead of answering")
     def test_general_question_known_gap(self):
@@ -122,9 +124,11 @@ class AnswerTest(unittest.TestCase):
         self.assertTrue(result.sources)
 
     @needs_model
-    @unittest.skip("known gap, planned for 1.1.3: a question naming a recipe shows recipes instead of answering")
-    def test_question_naming_a_recipe_known_gap(self):
+    def test_question_naming_a_recipe(self):
+        # Was a known gap until 1.1.3: it listed the whipped creams.
         result = ask.run("how long does whipped cream keep in the fridge")
+        self.assertEqual(result.kind, "answer")
+        result = ask.run("what can I substitute for buttermilk in pancakes?")
         self.assertEqual(result.kind, "answer")
 
 

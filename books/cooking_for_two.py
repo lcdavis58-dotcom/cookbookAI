@@ -34,6 +34,10 @@ INGREDIENT_STYLE = "volume_paren_metric"
 # The test kitchen's sidebar after a recipe, which can hold amounts of its
 # own ("NOTES FROM THE TEST KITCHEN", "SECRETS TO FOOLPROOF WHIPPED CREAM").
 ASIDE_RE = re.compile(r"^NOTES FROM THE TEST KITCHEN$")
+# A variation's name is a line of its own in title case ("Curried Lentil
+# Soup"), its method on the next; the sidebars' ALL-CAPS headings aren't.
+VARIATION_NAME_RE = re.compile(r"^(?=.*[a-z])([A-Z][\w’'\-]*(?:,?\s+(?:[A-Z][\w’'\-]*|and|with|or|of|the|a|in|on|"
+                               r"for|de|al|alla))*)$")
 
 
 # Chapter headings are 27.5; their opening sidebars carry yield lines of

@@ -271,7 +271,8 @@ def enough_to_use(count):
 
 def find_matches(index, have):
     """(results, whether they're only partial), best first: most of the
-    listed ingredients used, then fewest missing, then fewest assumptions.
+    listed ingredients used, then the rarer ones (see rarity below), then
+    fewest missing, then fewest assumptions.
 
     Listed pantry staples don't count, since nearly everything uses
     them, unless staples are all that's listed. Results are the recipes
@@ -285,6 +286,16 @@ def find_matches(index, have):
 
     found = [r for r in (matcher.check_recipe(e) for e in index) if r and used(r)]
     enough = [r for r in found if used(r) >= enough_to_use(len(counted))]
-    return (sorted(enough or found, key=lambda r: (-used(r), len(r["missing"]), len(r["assumptions"]),
+
+    # Of two recipes using as many listed ingredients, the one using the
+    # rarer ones comes first: for "pumpkin, cream cheese, heavy cream",
+    # a pumpkin pie before a whipped cream, since far fewer recipes use
+    # pumpkin than heavy cream.
+    users = {item: sum(1 for r in found if item in r["uses"]) for item in counted}
+
+    def rarity(result):
+        return round(sum(1 / users[item] for item in result["uses"] if users.get(item)), 9)
+
+    return (sorted(enough or found, key=lambda r: (-used(r), -rarity(r), len(r["missing"]), len(r["assumptions"]),
                                                     r["entry"]["title"].lower())),
             not enough and bool(found))

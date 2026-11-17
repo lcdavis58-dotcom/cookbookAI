@@ -25,7 +25,15 @@ names. A title's words are split in two:
             Mango Caramel" and "pasta with mushrooms" picks "Pasta with
             Mushrooms" over the other "Pasta with ..." titles
 A book module can give a recipe extra searchable titles (TITLE_ALIASES,
-see books/engine.py), each scored like a title of its own.
+see books/engine.py), each scored like a title of its own. A recipe's
+variations ("Brown Butter Cream Cheese Frosting", printed inside Classic
+Cream Cheese Frosting) are searched the same way in what a person types
+(loose=True), and the result says which recipe was found through one
+(LookupResult.via), so the reply can say so.
+
+Words written apart or together count as the same: "butter cream" names
+a title's "Buttercream", and "short bread" its "Shortbread" (and the
+other way round), when the joined or split word is a title word.
 
 A book named in the question ("from dessert persn", "from sfah") limits
 the search to that book's recipes; see find_books for how forgiving
@@ -41,7 +49,8 @@ lookup() returns one of:
                 best score: the question names them
     "partial"   no full title at the best score, but some titles share
                 most of their words with it: the closest few, for the
-                caller to offer ("Did you mean ...")
+                caller to offer ("Did you mean ..."); clear is the one
+                that's plainly closest, if one is (see _clear_best)
     "none"      nothing close
 """
 
@@ -74,7 +83,10 @@ REQUEST_WORDS = {"double", "doubled", "triple", "tripled", "quadruple", "half", 
 
 # Words that say what's wanted without naming a dish, on top of
 # REQUEST_WORDS: "show me some pie crust recipes".
-ASKING_WORDS = REQUEST_WORDS | {"me", "some", "any", "all", "every", "give", "list", "get", "good"}
+# "from" is left over once a book's name is taken out ("... from dessert
+# person").
+ASKING_WORDS = REQUEST_WORDS | {"me", "some", "any", "all", "every", "give", "list", "get", "good", "from",
+                                "see", "pull", "up", "open", "look", "is", "there", "do", "have", "got"}
 
 # Words a person uses interchangeably in a recipe's name: "all butter
 # pie crust" is what The Book On Pie calls "All-Buttah Pie Dough".
@@ -91,6 +103,10 @@ ACRONYM_MIN_LETTERS = 3
 # words, or one word that's at least half the title ("brownies" for
 # "Fudgy Brownies").
 PARTIAL_MIN_WORDS = 2
+
+# The shortest part a typed word is split into to find two title words
+# ("shortbread" -> "short bread"), so "pecan" never splits as "pe can".
+COMPOUND_MIN_LETTERS = 4
 
 # How many titles a "Did you mean" or "which one" list shows.
 MAX_LISTED = 10
@@ -179,6 +195,7 @@ class Candidate:
     title: str              # as shown to the user
     variants: list          # (core words, extra words) per searchable title
     payload: dict = field(default=None, repr=False)   # the index entry or hit
+    variations: list = field(default_factory=list)    # (words, name) per variation
 
 
 def _split_soft(core, extra):
@@ -211,7 +228,9 @@ def candidates_from_index(entries):
     for e in entries:
         variants = _variants(e.get("match_title") or e["title"], e["title"], e.get("aliases", []))
         if variants:
-            out.append(Candidate(e["recipe_id"], e["book"], e["title"], variants, e))
+            variations = [(words, name) for name in e.get("variations", [])
+                          if (words := list(dict.fromkeys(title_tokens(name))))]
+            out.append(Candidate(e["recipe_id"], e["book"], e["title"], variants, e, variations))
     return out
 
 
@@ -244,6 +263,7 @@ class Scored:
     full: bool              # every core word named
     exact: bool             # every word named, extra too
     extra_named: int        # extra words named
+    via: str = None         # the variation it was found through, if any
 
 
 @dataclass
@@ -253,6 +273,9 @@ class LookupResult:
     more: int = 0           # how many more there were past MAX_LISTED
     typos: dict = None      # question word -> the title words it was read as
     books: list = None      # the books the question names (see find_books)
+    via: dict = field(default_factory=dict)   # candidate key -> the variation it was found through
+    clear: Candidate = None # "partial": the one plainly closest title, if any
+    rest: list = field(default_factory=list)  # the Candidates past MAX_LISTED, best first
 
 
 def _words(text):
@@ -368,16 +391,28 @@ def find_books(question, books, title_words=frozenset()):
     return sorted(named), cleaned
 
 
-def _score(candidate, question_forms, guess_forms):
-    """The best-scoring of a candidate's searchable titles."""
+def _searchable(candidate, variations):
+    """(core, extra, variation name or None) for each title to score."""
+    yield from ((core, extra, None) for core, extra in candidate.variants)
+    if variations:
+        yield from ((words, [], name) for words, name in candidate.variations)
+
+
+def _score(candidate, question_forms, guess_forms, variations=False, joined=frozenset()):
+    """The best-scoring of a candidate's searchable titles (and, with
+    variations, its variations' names; the title wins a tie). A title
+    word the question spells as two (joined: "butter cream" for
+    "buttercream") counts as the two words it names."""
+    def named(words, forms):
+        return sum(2 if word_forms(w) & joined else 1 for w in words if word_forms(w) & forms)
+
     best = None
-    for core, extra in candidate.variants:
-        named_core = sum(1 for w in core if word_forms(w) & question_forms)
+    for core, extra, via in _searchable(candidate, variations):
+        full = all(word_forms(w) & question_forms for w in core)
         named_extra = sum(1 for w in extra if word_forms(w) & question_forms)
-        guess = sum(1 for w in core + extra if word_forms(w) & guess_forms)
-        full = named_core == len(core)
-        s = Scored(candidate, named_core + named_extra, guess, len(core) + len(extra),
-                   full, full and named_extra == len(extra), named_extra)
+        s = Scored(candidate, named(core, question_forms) + named(extra, question_forms),
+                   named(core + extra, guess_forms), len(core) + len(extra),
+                   full, full and named_extra == len(extra), named_extra, via)
         if best is None or (s.full, s.guess, s.score, s.exact) > (best.full, best.guess, best.score, best.exact):
             best = s
     return best
@@ -404,6 +439,39 @@ def _question_forms(words, vocabulary):
             for w in close:
                 forms |= word_forms(w)
     return forms, typos
+
+
+def _compound_forms(words, vocabulary):
+    """The title words a question spells apart or together, as (joined,
+    split) forms: "butter cream" for "buttercream", "shortbread" for
+    "short bread". Each part of a split word is at least
+    COMPOUND_MIN_LETTERS long."""
+    forms, joined = set(), set()
+    for a, b in zip(words, words[1:]):
+        for form in word_forms(a + b) & vocabulary.keys():
+            joined |= word_forms(vocabulary[form])
+    for w in words:
+        if word_forms(w) & vocabulary.keys():
+            continue
+        for i in range(COMPOUND_MIN_LETTERS, len(w) - COMPOUND_MIN_LETTERS + 1):
+            head, tail = w[:i], w[i:]
+            if word_forms(head) & vocabulary.keys() and word_forms(tail) & vocabulary.keys():
+                forms |= word_forms(head) | word_forms(tail)
+    return joined, forms
+
+
+def _join_compounds(words, vocabulary):
+    """The words with each neighbouring pair that spells one title word
+    joined: ["butter", "cream"] -> ["buttercream"]."""
+    out, i = [], 0
+    while i < len(words):
+        if i + 1 < len(words) and word_forms(words[i] + words[i + 1]) & vocabulary.keys():
+            out.append(words[i] + words[i + 1])
+            i += 2
+        else:
+            out.append(words[i])
+            i += 1
+    return out
 
 
 def _with_same_words(forms):
@@ -444,11 +512,18 @@ def list_titles(what, question, candidates):
     words = list(dict.fromkeys(_dish_words(title_tokens(find_books(what, {c.book for c in candidates}, title_words)[1]))))
     if not words:
         return []
+    # "butter cream" can also mean the one title word "buttercream".
+    vocabulary = {form: w for c in in_books for core, extra in c.variants for w in core + extra
+                  for form in word_forms(w)}
+    readings = [words]
+    joined = _join_compounds(words, vocabulary)
+    if joined != words:
+        readings.append(joined)
 
     def has_all(candidate):
         return any(all(_with_same_words(word_forms(w)) & {f for t in core + extra for f in word_forms(t)}
-                       for w in words)
-                   for core, extra in candidate.variants)
+                       for w in reading)
+                   for core, extra in candidate.variants for reading in readings)
 
     found = {c.key: c for c in _kind_recipes(words, in_books)}
     found.update((c.key, c) for c in in_books if has_all(c))
@@ -475,14 +550,19 @@ def lookup(question, candidates, nearby=None, loose=True):
 
     vocabulary = {}
     for c in candidates:
-        for core, extra in c.variants:
+        for core, extra, _ in _searchable(c, loose):
             for w in core + extra:
                 for form in word_forms(w):
                     vocabulary.setdefault(form, w)
 
     words = list(dict.fromkeys(title_tokens(cleaned)))
     question_forms, typos = _question_forms(words, vocabulary)
-    guess_forms, _ = _question_forms([w for w in words if w not in REQUEST_WORDS], vocabulary)
+    guess_words = [w for w in words if w not in REQUEST_WORDS]
+    guess_forms, _ = _question_forms(guess_words, vocabulary)
+    joined, split = _compound_forms(words, vocabulary)
+    question_forms |= joined | split
+    joined, split = _compound_forms(guess_words, vocabulary)
+    guess_forms |= joined | split
     if loose:
         question_forms, guess_forms = _with_same_words(question_forms), _with_same_words(guess_forms)
         of_kind = _kind_recipes(words, candidates)
@@ -499,10 +579,15 @@ def lookup(question, candidates, nearby=None, loose=True):
                                              s.candidate.book, s.candidate.title))
 
     def result(kind, ordered):
-        return LookupResult(kind, [s.candidate for s in ordered[:MAX_LISTED]],
-                            max(0, len(ordered) - MAX_LISTED), typos, named_books)
+        seen = set()
+        ordered = [s for s in ordered if not (s.candidate.key in seen or seen.add(s.candidate.key))]
+        found = LookupResult(kind, [s.candidate for s in ordered[:MAX_LISTED]], max(0, len(ordered) - MAX_LISTED),
+                             typos, named_books, {s.candidate.key: s.via for s in ordered if s.via})
+        found.rest = [s.candidate for s in ordered[MAX_LISTED:]]
+        return found
 
-    scored = [s for s in (_score(c, question_forms, guess_forms) for c in candidates) if s and s.guess > 0]
+    scored = [s for s in (_score(c, question_forms, guess_forms, loose, joined) for c in candidates)
+              if s and s.guess > 0]
     if not scored:
         return result("none", [])
     best = max(s.guess for s in scored)
@@ -534,7 +619,20 @@ def lookup(question, candidates, nearby=None, loose=True):
     # words, but "Banana Bread" is all there.
     full = [s for s in scored if s.full and worth_guessing(s)]
     top_full = [s for s in full if s.guess == max(f.guess for f in full)] if full else []
-    return result("partial", order(top_full) + order(close))
+    found = result("partial", order(top_full) + order(close))
+    found.clear = _clear_best(close, top_full)
+    return found
+
+
+def _clear_best(close, top_full):
+    """The one title plainly closest to a question that names none in
+    full: the only one at the best score, naming at least half its words
+    ("extra thick whipped cream" for "Extra-Thick and Creamy Whipped
+    Cream"), with no other title named in full. None otherwise."""
+    if len(close) != 1 or any(s.candidate.key != close[0].candidate.key for s in top_full):
+        return None
+    s = close[0]
+    return s.candidate if s.guess >= PARTIAL_MIN_WORDS and 2 * s.guess >= s.total else None
 
 
 def load_candidates(hits):

@@ -213,5 +213,68 @@ class Books(unittest.TestCase):
         self.assertEqual([c.key for c in result.matches], ["p4"])
 
 
+class SplitAndJoinedWordsTest(unittest.TestCase):
+    """1.1.3: "butter cream" for "Buttercream", "short bread" the other way."""
+    SHELF = candidates_from_index([entry("j1", "Book J", "Buttercream"),
+                                   entry("j2", "Book J", "Short Bread"),
+                                   entry("j3", "Book J", "Peanut Butter Cream Pie")])
+
+    def find(self, question):
+        result = lookup(question, self.SHELF)
+        return result.kind, [c.key for c in result.matches]
+
+    def test_written_apart(self):
+        self.assertEqual(self.find("show me the butter cream"), ("match", ["j1"]))
+
+    def test_written_together(self):
+        self.assertEqual(self.find("double the shortbread"), ("match", ["j2"]))
+
+    def test_the_words_apart_still_count(self):
+        self.assertEqual(self.find("peanut butter cream pie"), ("match", ["j3"]))
+
+
+class VariationsTest(unittest.TestCase):
+    """1.1.3: a recipe found through a variation printed inside it."""
+    SHELF = candidates_from_index([
+        dict(entry("v1", "Book V", "Classic Cream Cheese Frosting"),
+             variations=["Brown Butter Cream Cheese Frosting", "Chocolate Cream Cheese Frosting"]),
+        entry("v2", "Book W", "Cream Cheese Frosting"),
+        entry("v3", "Book W", "Brown Butter Carrot Cake"),
+    ])
+
+    def test_found_through_its_variation(self):
+        result = lookup("show me my brown butter cream cheese frosting", self.SHELF)
+        self.assertEqual((result.kind, [c.key for c in result.matches]), ("match", ["v1"]))
+        self.assertEqual(result.via, {"v1": "Brown Butter Cream Cheese Frosting"})
+
+    def test_the_title_wins_a_tie(self):
+        result = lookup("cream cheese frosting", self.SHELF)
+        self.assertEqual(sorted(c.key for c in result.matches), ["v1", "v2"])
+        self.assertEqual(result.via, {})
+
+    def test_linking_at_ingest_leaves_variations_out(self):
+        result = lookup("brown butter cream cheese frosting", self.SHELF, loose=False)
+        self.assertEqual(result.via, {})
+
+
+class ClearBestTest(unittest.TestCase):
+    """1.1.3: a near miss with one title plainly closest."""
+    SHELF = candidates_from_index([entry("w1", "Book W", "Extra-Thick and Creamy Whipped Cream"),
+                                   entry("w2", "Book W", "Chocolate Whipped Cream"),
+                                   entry("w3", "Book W", "Almond Butter Banana Bread"),
+                                   entry("w4", "Book W", "Banana Bread")])
+
+    def test_one_plainly_closest(self):
+        result = lookup("show me the extra thick creamy cream", self.SHELF)
+        self.assertEqual((result.kind, result.clear.key), ("partial", "w1"))
+
+    def test_not_when_another_is_named_in_full(self):
+        result = lookup("how much almond butter is in the banana bread", self.SHELF)
+        self.assertIsNone(result.clear)
+
+    def test_not_from_a_few_words_of_a_long_title(self):
+        self.assertIsNone(lookup("show me the thick cream", self.SHELF).clear)
+
+
 if __name__ == "__main__":
     unittest.main()

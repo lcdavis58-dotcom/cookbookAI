@@ -251,6 +251,39 @@ _WAYS_TAIL_RE = re.compile(r",\s*(?:\d+|[A-Za-z]+)\s+Ways$", re.IGNORECASE)
 _WITH_TAIL_RE = re.compile(r"\s+with\s+", re.IGNORECASE)
 
 
+_ENDS_PARAGRAPH_RE = re.compile(r"[.!?)”\"’]$|^\s*variations?\s*:?$", re.IGNORECASE)
+# A name starting with one of these is an instruction, not a dish.
+_INSTRUCTION_WORDS = frozenset("""a an the to for if in on omit add mix make use using replace substitute
+    proceed follow stir bake cook roll keep store how you this it when once instead after before
+    try serve note click""".split())
+_ING_FOODS = frozenset({"pudding", "dumpling", "stuffing", "icing", "filling", "topping", "frosting",
+                        "spring", "herring", "whiting"})
+_NAME_WORD_RE = re.compile(r"[A-Za-zÀ-ÿ’'\-]+")
+MAX_VARIATION_NAME_WORDS = 9
+
+
+def _is_variation_name(name, title):
+    """A short name that isn't an instruction, and either shares a word
+    with the recipe's title ("Meyer Lemon Curd" in "Lemon Curd") or is
+    capitalized like a dish's name ("Greek Salad", "APPLE SLAW"): a
+    bare change like "Mint" or "Whole grain" names no dish of its own."""
+    words = _NAME_WORD_RE.findall(name)
+    if not words or len(words) > MAX_VARIATION_NAME_WORDS or words[0].lower() in _INSTRUCTION_WORDS:
+        return False
+    if any(c.isdigit() for c in name):
+        return False
+    # "Preparing Butternut Squash", "Coring Apples": a how-to sidebar.
+    first = words[0].lower()
+    if first.endswith("ing") and first not in _ING_FOODS:
+        return False
+    title_words = {w.lower() for w in _NAME_WORD_RE.findall(title)}
+    shares = any(w.lower() in title_words or w.lower().rstrip("s") in title_words for w in words
+                 if len(w) > 2 and w.lower() not in _INSTRUCTION_WORDS | {"and", "with", "or", "of"})
+    capitalized = len(words) > 1 and all(w[0].isupper() for w in words
+                                         if w.lower() not in {"and", "with", "or", "of", "the", "a", "in"})
+    return shares or capitalized
+
+
 class Profile:
     """Everything the main scripts ask of a book (see books/__init__.py):
     the module's own settings and functions where it has them, the
@@ -281,6 +314,12 @@ class Profile:
                               Book's "Favorite Thin and Crispy", in the
                               chocolate chip chapter). Stored in the
                               recipe index; see query_utils/title_lookup.py
+        VARIATIONS_HEADING_RE the line a recipe's variations follow
+                              ("VARIATIONS"), or None for a book whose
+                              variations can't be told apart (prose)
+        VARIATION_NAME_RE     a variation's name, as group 1, at the start
+                              of a line that starts a paragraph: "Name:
+                              ..." by default; see variation_names
     """
 
     TITLE_ITALIC = False
@@ -296,6 +335,8 @@ class Profile:
     INGREDIENTS_RIGHT_AFTER = False
     TITLE_ALIASES = {}
     TITLE_THEN_INGREDIENTS = False
+    VARIATIONS_HEADING_RE = re.compile(r"^\s*variations?\s*:?\s*$", re.IGNORECASE)
+    VARIATION_NAME_RE = re.compile(r"^([A-Z][^:.\n]{1,70}?):\s")
 
     def __init__(self, module):
         self.module = module
@@ -363,6 +404,36 @@ class Profile:
         if m := _WAYS_TAIL_RE.search(title or ""):
             aliases.append(title[:m.start()].strip())
         return aliases
+
+    def variation_names(self, text):
+        """The names of the variations printed after a recipe's
+        VARIATIONS heading ("Brown Butter Cream Cheese Frosting" in
+        Dessert Person's Classic Cream Cheese Frosting), as printed. A
+        name starts a paragraph: the line after the heading, or after a
+        line that ends a sentence, so a wrapped line ("Poached Eggs.")
+        isn't one. Instructions ("Mix the dough by hand:") and names that
+        are only a change ("Mint:", "Nuts:" in a brownie recipe) are left
+        out; see _is_variation_name."""
+        if self.VARIATIONS_HEADING_RE is None:
+            return []
+        lines = (text or "").splitlines()
+        title = lines[0] if lines else ""
+        names = []
+        for i, line in enumerate(lines):
+            if not self.VARIATIONS_HEADING_RE.match(line):
+                continue
+            previous = line
+            for later in lines[i + 1:]:
+                starts_paragraph = (_ENDS_PARAGRAPH_RE.search(previous.strip())
+                                    or later.lstrip().startswith("•"))
+                m = self.VARIATION_NAME_RE.match(later.strip()) if starts_paragraph else None
+                if m:
+                    name = " ".join(m.group(1).split()).strip(" ,")
+                    if _is_variation_name(name, title) and name not in names:
+                        names.append(name)
+                previous = later
+            break
+        return names
 
     def ingredient_start(self, lines):
         """Where the ingredient list begins: after the yield block (or the

@@ -29,6 +29,9 @@ INGREDIENT_STYLE = "volume_paren_metric"
 # Nothing in the text marks a step; ingest marks where the 11.3pt list
 # gives way to the 15pt method (list_end_lines) and the list ends there.
 STEP_RE = re.compile(r"(?!)")
+# Variations are bullets naming the dish in passing: "• To make Caprese
+# Salad , alternate ..." (the PDF puts a space before the comma).
+VARIATION_NAME_RE = re.compile(r"^•\s*(?:To\s+make|For|Make)\s+(?:an?\s+|the\s+)?(.+?)\s+,")
 
 _LIST_SIZE = (11.0, 11.6)
 _METHOD_SIZE = (14.5, 15.5)

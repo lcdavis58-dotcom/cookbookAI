@@ -32,6 +32,10 @@ def run_route(router, route):
             return ask.about(route.recipe, route.request)
         if route.mode == "list":
             return ask.list_recipes(route.find_text, route.request)
+        if route.mode == "choose":
+            return ask.AskResult("choices", route.request, choices=route.choices, heading=route.text)
+        if route.mode == "more":
+            return ask.more(route.choices, route.first)
         return ask.run(route.find_text)
     if route.action == "scale":
         if route.mode == "find":
@@ -41,7 +45,9 @@ def run_route(router, route):
             route = router.scale_route(route.how, recipe, route.request, route.detail, route.remember_as)
         return scale.scale_recipe(route.recipe, route.request, base=route.base, batch=route.batch,
                                   factor=route.factor, explanation=route.explanation)
-    return match.run(route.request)
+    result = match.run(route.request)
+    result.page, result.first_number = route.page, route.first
+    return result
 
 
 def respond(state, message, candidates=None):

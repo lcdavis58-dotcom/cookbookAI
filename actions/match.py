@@ -44,6 +44,28 @@ class MatchResult:
     missing_some: list = field(default_factory=list)
     staples: set = field(default_factory=set)
     only_partial: bool = False      # nothing used enough of what's listed, so these use some of it
+    page: int = 0                   # which SHOW_PER_SECTION-long part of each section the chat shows
+    first_number: int = 1           # the chat's number for the first recipe on that page
+
+
+SECTIONS = (("You can make", "ready"),
+            ("You can make, with a sub-recipe from scratch", "from_scratch"),
+            ("Missing some ingredients", "missing_some"))
+
+
+def section_page(result, results):
+    """The part of one section on result's page."""
+    return results[result.page * SHOW_PER_SECTION:(result.page + 1) * SHOW_PER_SECTION]
+
+
+def page_of(result):
+    """Every recipe on result's page, in the order the chat numbers them."""
+    return [r for _, name in SECTIONS for r in section_page(result, getattr(result, name))]
+
+
+def left_after(result, results):
+    """How many of a section's recipes come after result's page."""
+    return max(0, len(results) - (result.page + 1) * SHOW_PER_SECTION)
 
 
 def _combined(notes):

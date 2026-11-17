@@ -32,6 +32,10 @@ TITLE_MAX_GAP = 10
 YIELD_RE = re.compile(r"^Makes\b")
 HEADER_FIELD_RE = re.compile(r"^DIFFICULTY:")
 INGREDIENT_STYLE = "metric_slash"
+# A variation opens with its name in capitals, then its method on the
+# same line ("SWEETER CORNBREAD Use 71 g ..."); two capital words at least.
+VARIATION_NAME_RE = re.compile(r"^([A-Z][A-Z’'\-&]*(?:,?\s+(?:[A-Z][A-Z’'\-&]*|\([A-Z][A-Z’'\- ]*\)))+)"
+                               r"\s+(?=[A-Z][a-z]|\d)")
 
 
 # A prose line runs the width of the column; one that long without an

@@ -14,7 +14,7 @@ from actions import ask, match, scale
 from chat import turn
 from chat.state import ChatState
 from match_utils.recipe_index import load_index
-from testing.local.needs import needs_database, needs_index
+from testing.local.needs import needs_database, needs_index, needs_search
 from testing.local.test_pdfs import RECIPES
 
 
@@ -67,6 +67,52 @@ class ScaleRealRecipeTest(unittest.TestCase):
         self.assertEqual(shown.result.recipe.title, "Favorite Thin and Crispy")
         self.assertEqual(turn.respond(state, "triple it").result.factor, 3.0)
         self.assertEqual(turn.respond(state, "cut in in half").result.factor, 1.5)
+
+
+@needs_database
+@needs_search
+class FindTheRightRecipeTest(unittest.TestCase):
+    """1.1.3, from real chats (2026-11-06 and 2026-11-07); no model."""
+
+    def test_butter_cream_from_a_book(self):
+        result = ask.run("show me my butter cream recipe from dessert person")
+        self.assertEqual((result.kind, result.recipe.title), ("recipe", "Silkiest Chocolate Buttercream"))
+
+    def test_found_through_a_variation_says_so(self):
+        result = ask.run("show me my brown butter cream cheese frosting")
+        self.assertEqual((result.kind, result.recipe.title), ("recipe", "Classic Cream Cheese Frosting"))
+        self.assertTrue(ask.variation_note(result).startswith("Brown Butter Cream Cheese Frosting is a variation"))
+
+    def test_the_extra_thick_one(self):
+        state = ChatState.new()
+        turn.respond(state, "show me classic whipped cream")
+        shown = turn.respond(state, "what about the extra-thick one")
+        self.assertEqual(shown.result.recipe.title, "Extra-Thick and Creamy Whipped Cream")
+        self.assertEqual(state.focus.recipe.title, "Extra-Thick and Creamy Whipped Cream")
+
+    def test_the_one_from_another_book(self):
+        state = ChatState.new()
+        turn.respond(state, "show me the chocolate chip cookies from ratio")
+        shown = turn.respond(state, "show me the one from dessert person")
+        self.assertEqual((shown.result.recipe.title, shown.result.recipe.book),
+                         ("Chocolate Chip Cookies", "Dessert Person"))
+
+
+@needs_index
+class MoreAndOrderTest(unittest.TestCase):
+    def test_rarer_ingredients_break_a_tie(self):
+        # A whipped cream once came first for these; the user moved the
+        # fix into 1.1.3.
+        result = match.run("pumpkin, cream cheese, heavy cream")
+        self.assertIn("Pumpkin", titles(result.missing_some)[0])
+
+    def test_more_shows_the_rest(self):
+        state = ChatState.new()
+        turn.respond(state, "cinnamon, heavy cream")
+        self.assertEqual(len(state.focus.numbered.items), 15)
+        more = turn.respond(state, "more")
+        self.assertIn("  16. ", more.text)
+        self.assertEqual(len(state.focus.numbered.items), 30)
 
 
 if __name__ == "__main__":
