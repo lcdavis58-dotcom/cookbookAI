@@ -103,6 +103,12 @@ class RoutingTest(unittest.TestCase):
         # 1.1.3 (a question about recipes it names).
         self.check("what goes well with pumpkin pie?", "ask")
 
+    @unittest.skip("known gap, planned for 1.2.1: since 1.2.0 the model sends it to the filter, which asks "
+                   "for a dish (flag 1ncny)")
+    def test_recipes_that_use_an_ingredient_known_gap(self):
+        # 1.1.3 matched on buttermilk; "a lot of" isn't read either way.
+        self.check("show recipes that use a lot of buttermilk", "match", has=("buttermilk",))
+
     @unittest.skip("known gap, planned for 1.4.0: the model asks her what she means instead of answering")
     def test_general_question_known_gap(self):
         self.check("what's the difference between baking soda and baking powder?", "ask")

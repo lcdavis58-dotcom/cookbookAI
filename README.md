@@ -199,6 +199,8 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 - **1.5.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab), and answer general cooking questions ("what's the difference between baking soda and baking powder?")
 - Move from the Raspberry Pi to a GPU machine
 - compare recipes, mark recipes as favorites so they are prioritized when retrieving recipes
+- show the recipes that use a sub-recipe ("what uses mother dough?"), from the sub-recipe links made at ingest
+- answer pan questions without a recipe ("a recipe for three 8-inch pans, how do I scale it for two 6-inch pans?"): give the factor from the pan areas
 - **Ongoing:** the scored eval set (`tools/run_evals.py`, see [Evals](#evals)), started in 1.2.0 from the existing tests, with cases added for each version above where it applies
 
 ## Note
