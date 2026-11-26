@@ -164,6 +164,20 @@ class ModelFilterTest(unittest.TestCase):
                           self.call(ingredient="pecans", without="false", dish="none"))
         self.assertEqual(result.label, "model: ask filter list with pecans")
 
+    def test_no_dish_and_no_list_filters_every_recipe(self):
+        # Flag 1ncny: 1.2.0 asked for a dish here.
+        result, _ = route(fresh(), "show recipes that use a lot of pecans",
+                          self.call(ingredient="pecans", without=False))
+        self.assertEqual(result.label, "model: ask filter all with pecans")
+        self.assertTrue(result.every)
+        self.assertEqual(len(result.choices), len(CANDIDATES))
+
+    def test_these_or_without_and_no_list_asks_for_a_dish(self):
+        for args in ({"dish": "these", "without": False}, {"without": True}):
+            with self.subTest(args=args):
+                result, _ = route(fresh(), "anything pecan-ish for me", self.call(ingredient="pecans", **args))
+                self.assertEqual(result.label, "model: reply filter, no list")
+
     def test_not_an_ingredient(self):
         result, _ = route(fresh(), "pie but not in an oven", self.call(ingredient="oven", without=True, dish="pie"))
         self.assertEqual(result.label, "model: ask filter_recipes, not an ingredient or dish, so answered")
@@ -192,6 +206,17 @@ class TurnTest(unittest.TestCase):
         self.assertIn("Chocolate Whipped Cream", result.text)
         self.assertIn("Mocha Whipped Cream - bittersweet chocolate", result.text)
         self.assertNotIn("Classic Whipped Cream", result.text)
+
+    def test_every_recipe_reply(self):
+        with mock.patch.object(router.models, "chat", return_value=(
+                {"message": {"tool_calls": [{"function": self.call_args("pecans")}]}}, 0.1)):
+            result = turn.respond(fresh(), "show recipes that use pecans", CANDIDATES)
+        self.assertIn("1 recipe uses pecans:", result.text)
+        self.assertNotIn("The other", result.text)
+
+    @staticmethod
+    def call_args(ingredient):
+        return {"name": "filter_recipes", "arguments": {"ingredient": ingredient, "without": False}}
 
     def test_none_keeps_the_list(self):
         state = pies_listed()

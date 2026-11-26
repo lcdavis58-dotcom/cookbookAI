@@ -1,10 +1,11 @@
 {
-  "_comment": "Counted ingredients (no weight or volume) that only come whole. 'not_scaled': left at the recipe's amount with the note, since a fraction of one means a different pan, not more of it (decided 2026-11-16; may change with feedback). 'whole_units': rounded to a whole number, at least 1, with a note when that changes it by more than a tenth. 'always_noted_units': rounded the same way, with the exact amount noted whenever it changes (eggs, decided 2026-11-16: round and show the exact so she can judge). 'rough_units': rounded the same way with no note, they're rough to begin with. A crust with a weight is scaled by the weight like anything else; the others round only the count and leave a weight exact. Keywords are matched as whole words (plural allowed) against the unit and the ingredient part of the name (before the first comma).",
+  "_comment": "Counted ingredients (no weight or volume) that only come whole. 'not_scaled': left at the recipe's amount with the note, since a fraction of one means a different pan, not more of it (decided 2026-11-16; may change with feedback). 'whole_units': rounded to a whole number, at least 1, with a note when that changes it by more than a tenth. 'always_noted_units': rounded the same way, with the exact amount noted whenever it changes (eggs, decided 2026-11-16: round and show the exact so she can judge), followed by 'always_noted_tip' (how to measure part of one), only when the count was rounded (flag wg7cv). 'rough_units': rounded the same way with no note, they're rough to begin with. A crust with a weight is scaled by the weight like anything else; the others round only the count and leave a weight exact. Keywords are matched as whole words (plural allowed) against the unit and the ingredient part of the name (before the first comma).",
   "not_scaled": {
     "keywords": ["piecrust", "pie crust", "crust", "pie shell", "tart shell"],
     "note": "Not scaled: a crust doesn't come in fractions. More or less filling usually means a bigger or smaller pan (or a second crust), depending on the pans you have."
   },
   "whole_units": ["can", "jar", "package", "packet", "envelope", "bag", "box", "sheet"],
   "always_noted_units": ["egg", "yolk"],
+  "always_noted_tip": "For an exact amount, whisk one egg and measure part of it: a large egg is about 3 tablespoons, a yolk about 1, a white about 2.",
   "rough_units": ["pinch", "dash"]
 }

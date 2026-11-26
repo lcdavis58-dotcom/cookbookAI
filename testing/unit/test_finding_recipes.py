@@ -123,6 +123,12 @@ class WordingTest(unittest.TestCase):
                          ["assuming your chocolate is the kind each recipe calls for",
                           "assuming your butter is salted butter"])
 
+    def test_one_kind_in_two_word_orders_is_one_note(self):
+        # Flag 1ncny: both were shown.
+        notes = ["assuming your buttermilk is cultured low-fat buttermilk",
+                 "assuming your buttermilk is low-fat cultured buttermilk"]
+        self.assertEqual(match._combined(notes), notes[:1])
+
     def test_empty_sections_are_left_out(self):
         text = reply.match_reply(match.MatchResult("matches", have=["lemon"], missing_some=[self.found(["x"])]))
         self.assertNotIn("(none)", text)

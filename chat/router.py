@@ -165,6 +165,12 @@ NOT_INGREDIENT_WORDS = frozenset("""i i'm im me my you your we us it it's its th
 MAX_INGREDIENT_WORDS = 4
 _LEADING_RE = re.compile(r"^\s*(?:with|the|my|some|any|a|an|also)\s+", re.I)
 _TRAILING_RE = re.compile(r"\s+(?:too|as\s+well|also|instead)\s*$", re.I)
+# A question after her ingredients: "i have shrimp and pasta, what can i
+# make" (flag 1tj6n). "can" only with a person after it, so "pasta, can
+# of tomatoes" keeps the can.
+_ASKING_TAIL_RE = re.compile(r"\s*[,;.!]\s*(?:(?:so|and|now|ok(?:ay)?)\s+)?(?:(?:how|what|when|why|where|which|who)\b"
+                             r"|(?:can|could|should|would|do|does|will)\s+(?:i|we|you)\b"
+                             r"|(?:any\s+)?(?:ideas|suggestions)\b).*$", re.I)
 
 
 @dataclass
@@ -204,6 +210,7 @@ class Route:
     ingredient: str = ""            # for "filter": the ingredient, as she typed it
     without: bool = False           # for "filter": the recipes without it
     what: str = ""                  # for "filter": the dish named ("pumpkin pie"), "" for the last list
+    every: bool = False             # for "filter": every recipe, with no dish named and no list on screen
     narrowing: str = ""             # what the recipes are, if there are too many ("cookie recipes")
 
     @property
@@ -279,7 +286,7 @@ def pick_from(message, candidates):
 
 def clean_items(text):
     """Ingredient words from a follow-up, without "the", "too" and such."""
-    text = _TRAILING_RE.sub("", text.strip(" .!?"))
+    text = _TRAILING_RE.sub("", _ASKING_TAIL_RE.sub("", text.strip()).strip(" .!?"))
     while _LEADING_RE.match(text):
         text = _LEADING_RE.sub("", text, count=1)
     return parse_have(re.sub(r"\b(?:the|my|some|any)\s+", "", text, flags=re.I))
@@ -632,9 +639,13 @@ class Router:
             return []
         return [c for c in (self.resolve(r) for r in numbered.items + numbered.rest if not r.gone) if c]
 
-    def filter_route(self, how, ingredient, without, dish, message):
+    def filter_route(self, how, ingredient, without, dish, message, every=False):
         """A filter of the last list (dish empty) or of a dish's recipes,
-        or None when the ingredient or dish isn't one."""
+        or None when the ingredient or dish isn't one. every: nothing
+        named a dish or a list ("show recipes that use buttermilk"), so
+        with no list on screen, "with" filters every recipe; otherwise it
+        asks for a dish ("do any of these use butter" with no list, and
+        "without", since nearly every recipe is without any one thing)."""
         ingredient = known_ingredient(ingredient, self.candidates)
         if ingredient is None:
             return None
@@ -650,6 +661,11 @@ class Router:
             return Route("ask", how, f"filter {what} {sense} {ingredient}", mode="filter", choices=recipes,
                          ingredient=ingredient, without=without, what=what, request=message)
         recipes = self.on_screen()
+        if not recipes and every and not without:
+            # "show recipes that use buttermilk": every recipe with it
+            # (flag 1ncny; 1.2.0 asked for a dish).
+            return Route("ask", how, f"filter all with {ingredient}", mode="filter", choices=self.candidates,
+                         ingredient=ingredient, request=message, every=True)
         if not recipes:
             return Route("reply", how, "filter, no list",
                          text=f"Which recipes should I check for {ingredient}? Name a dish, like "
@@ -839,11 +855,13 @@ class Router:
             return Route("match", "model", f"{mode} {items}", mode="run", request=", ".join(items))
         if name == "filter_recipes":
             dish = str(args.get("dish") or "").strip()
+            every = dish.lower() in ("", "none")
             if dish.lower() in ("none", "these", "the last list", "last list", "list"):
                 dish = ""
             without = args.get("without")
             without = without if isinstance(without, bool) else str(without).lower() == "true"
-            route = self.filter_route("model", str(args.get("ingredient") or ""), without, dish, message)
+            route = self.filter_route("model", str(args.get("ingredient") or ""), without, dish, message,
+                                      every=every)
             # "what goes well with pumpkin pie?" once came back as a
             # filter with no ingredient in it: a question, so answer it.
             return route or Route("ask", "model", f"{detail}, not an ingredient or dish, so answered",

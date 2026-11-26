@@ -37,11 +37,13 @@ def _without_note(use, typed):
     return f"it has {typed}{where}, but {' or '.join(swaps)} works" if swaps else ""
 
 
-def run(recipes, ingredient, without=False, what="", index=None, question=""):
+def run(recipes, ingredient, without=False, what="", index=None, question="", every=False):
     """recipes: title_lookup.Candidates (the list on screen, or a dish's
     recipes). what names them for the reply ("pumpkin pie"); empty for
-    the last list ("these"). index: every index entry, to follow
-    sub-recipes (default: the candidates' own)."""
+    the last list ("these"). every: recipes is every recipe, so the
+    reply says "12 recipes use ..." with no count of the others.
+    index: every index entry, to follow sub-recipes (default: the
+    candidates' own)."""
     typed = " ".join(ingredient.split())
     names = parse_have(typed)
     name = names[0] if names else typed.lower()
@@ -51,8 +53,8 @@ def run(recipes, ingredient, without=False, what="", index=None, question=""):
     kept = ([(c, u) for c, u in found if u is None or not u.needed] if without else with_it)
 
     count = len(kept)
-    if what:
-        some = _plural(count, f"{what} recipe")
+    if what or every:
+        some = _plural(count, f"{what} recipe" if what else "recipe")
     else:
         some = "this one" if len(recipes) == 1 else f"{count} of these"
     if not kept:
@@ -61,7 +63,8 @@ def run(recipes, ingredient, without=False, what="", index=None, question=""):
                     else f"All {_plural(len(recipes), f'{what} recipe')} use {typed}." if what
                     else f"All {len(recipes)} of these use {typed}.")
         else:
-            text = f"None of your {what} recipes use {typed}." if what else f"None of these use {typed}."
+            text = (f"None of your {what} recipes use {typed}." if what
+                    else f"None of your recipes use {typed}." if every else f"None of these use {typed}.")
         return AskResult("said", question, heading=text)
 
     footer = ""
@@ -74,7 +77,7 @@ def run(recipes, ingredient, without=False, what="", index=None, question=""):
         notes = {c.key: u.note(name) for c, u in kept}
         heading = f"{some} {'uses' if count == 1 else 'use'} {typed}:"
         left = len(recipes) - count
-        if left and not what:
+        if left and not what and not every:
             footer = f"The other {left} {'doesn' if left == 1 else 'don'}'t."
     choices = [c for c, _ in kept]
     return AskResult("choices", question, choices=choices[:SHOW_AT_ONCE], rest=choices[SHOW_AT_ONCE:],

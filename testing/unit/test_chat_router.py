@@ -127,6 +127,15 @@ class RulesTest(unittest.TestCase):
         result, called_model = route(after_match(), "do any of these use half and half")
         self.assertTrue(called_model, result.label)
 
+    def test_a_question_after_her_ingredients_isnt_one(self):
+        # Flag 1tj6n: "what can i make" was listed as an ingredient.
+        for message, expected in (("i have shrimp and pasta, what can i make", "shrimp, pasta"),
+                                  ("i have eggs and butter. any ideas", "egg, butter"),
+                                  ("i have pasta, can of tomatoes", "pasta, tomato")):
+            with self.subTest(message=message):
+                result, _ = route(fresh(), message)
+                self.assertEqual((result.action, result.request), ("match", expected))
+
     def test_cases(self):
         for message, make_state, expected in self.CASES:
             with self.subTest(message=message):

@@ -44,7 +44,7 @@ def run_route(router, route):
         if route.mode == "filter":
             return recipe_filter.run(route.choices, route.ingredient, route.without, route.what,
                                      index=[c.payload for c in router.candidates if c.payload],
-                                     question=route.request)
+                                     question=route.request, every=route.every)
         return ask.run(route.find_text)
     if route.action == "scale":
         if route.mode == "find":

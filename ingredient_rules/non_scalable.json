@@ -1,10 +1,6 @@
 {
-  "_comment": "Ingredients matched here are discrete/countable items where a fractional scaled amount isn't practical to use. 'keyword' is matched as a whole word (plural allowed) against the ingredient part of each parsed name (before the first comma), so 'egg' catches 'large eggs', 'egg whites' and 'egg yolks' but not 'eggplant' or a crust 'brushed with egg wash'. Add entries as you run into more of these.",
+  "_comment": "Ingredients matched here are discrete/countable items where a fractional scaled amount isn't practical to use. 'keyword' is matched as a whole word (plural allowed) against the ingredient part of each parsed name (before the first comma), so 'graham cracker' catches 'graham crackers' but not a crust 'made with graham cracker crumbs'. Eggs aren't here: they round in whole_items.json, with the measuring tip only when the count was rounded (flag wg7cv). Add entries as you run into more of these.",
   "ingredients": [
-    {
-      "keyword": "egg",
-      "note": "Eggs don't divide cleanly, so the count is rounded to whole eggs. For an exact amount, whisk one egg and measure part of it: a large egg is about 3 tablespoons, a yolk about 1, a white about 2."
-    },
     {
       "keyword": "graham cracker",
       "note": "Whole crackers/sheets don't split cleanly. Round to the nearest whole cracker, extra crumbs from a slightly-over amount are rarely a problem."
