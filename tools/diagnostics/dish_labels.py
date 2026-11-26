@@ -73,7 +73,7 @@ def score_key(labels_of, key, overrides=None):
 
 
 def report(entries, labels, types, sample=5, only=None, seed=0):
-    lines, rng = [], random.Random(seed)
+    lines, rng = [], random.Random(seed)  # nosec B311 - picks sample titles to show, not a secret
     by_type = defaultdict(list)
     for e in entries:
         for dish in e.get("dishes", []):

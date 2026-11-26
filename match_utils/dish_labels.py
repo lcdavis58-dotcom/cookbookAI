@@ -93,7 +93,7 @@ def load_types(path=None):
 
 
 def _hash(value):
-    return hashlib.sha1(json.dumps(value, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha1(json.dumps(value, sort_keys=True).encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def prompt_hash():
@@ -242,7 +242,7 @@ def headnote(text, title=""):
 
 
 def entry_hash(entry):
-    return hashlib.sha1(shown(entry).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha1(shown(entry).encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def clean(labels, types):
