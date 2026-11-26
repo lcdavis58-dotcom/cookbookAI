@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lcdavis58-dotcom/cookbookAI/actions/workflows/ci.yml)
 
-Version 1.2.0
+Version 1.2.1
 
 A local, private assistant for your own cookbooks. It reads cookbook PDFs into a vector database, then lets you ask questions about the recipes, scale them up or down, and find what you can make, in a chat on the command line or a website for your household. All of it runs on your own hardware with [Ollama](https://ollama.com) and [Chroma](https://www.trychroma.com); nothing is sent to a cloud service unless you choose to reach the website through one (see [The website](#the-website)).
 
@@ -101,6 +101,17 @@ python3 tools/flagged.py reopen ID                     # undo a mistaken "handle
 
 Each run rewrites `flags/open_flags.md` (still to fix) and `flags/handled_flags.md`, so they can be read without running it again. Marking a flag handled turns its flag green on the website. Like the chats, flags quote the books, so they stay out of the repository.
 
+## Reliability, evals and guardrails
+
+The model is a small local one (`qwen2.5:7b`), so the app is built not to trust it more than it has to.
+
+- **Rules first, the model for what's left.** Plain rules over the recipe index handle the common requests (a title, a number from a list, "double it", "without the pecans", "what can I make with..."), with no model call: 82% of the 71 replies saved before 1.2.1, 10% more from answering a question the chat asked. The model routes the rest by calling one of a fixed set of tools.
+- **Every tool call is checked before it runs.** An unknown tool, a list number that isn't on the list, a scale with no amount in her message, or a "current recipe" when there isn't one is refused and she's asked to say it another way. Scale amounts the model reads are checked against her words and the recipe (a yield it took from the recipe over the one she stated is corrected; made-up yields are refused), and the arithmetic is code, never the model. Dish labels must be one of the listed types.
+- **Answers are checked against their sources** (`actions/answer_checks.py`). The prompt tells the model to use only the excerpts it's given, quote amounts exactly and cite only those books and pages. Before an answer is shown, every number in it (with its unit: "1½ cups", "350°F", "12 to 14 minutes") must be in an excerpt, every page cited must be a page it was given, and every one of the library's books it names must be a source. An answer that fails is sent back once with what was wrong; if it still fails, it's shown with a note saying what couldn't be found, so she checks the book. Known gaps: an amount copied from another line of the recipe passes, and advice with no number in it isn't checked.
+- **Real-use mistakes become tests.** Any reply can be flagged as wrong (see [Flagged replies](#flagged-replies)). Each flag is reviewed, gets a regression test (skipped as a known gap until it's fixed), and is marked handled with what covers it.
+- **Evals.** `tools/run_evals.py` scores 43 chat messages end to end against the real books, index and model (the routes, lists, scale factors and cited books), and reports the answer checks too (see [Evals](#evals)). Dish labels are scored against a hand-checked set and a 50-recipe hold-out set that is never tuned to (38 right, 10 with an extra wrong type, 2 wrong).
+- **Metrics.** `tools/metrics.py` writes `metrics.md` in the data folder from every saved chat and flag, per version: how replies were routed, the model's tool calls that couldn't run as called, reply and model times, how many answers passed their checks at once, needed a second try or were shown with a warning, and flags per version. Chats keep the version of each reply from 1.2.1 on.
+
 ## Setup
 
 ```
@@ -172,7 +183,7 @@ Building the index (`ingest.py` or `tools/build_recipe_index.py`) also labels ea
 
 ## Tests
 
-The unit tests (`testing/unit/`) run in CI on every pull request and cover 80% of the code. The local tests (`testing/local/`) need the cookbook PDFs, the database built from them and the model, so they can't run in the cloud: the books are copyrighted and stay on your own machine. With them included, coverage is 91% (measured for 1.1.1).
+The unit tests (`testing/unit/`) run in CI on every pull request and cover 84% of the code. The local tests (`testing/local/`) need the cookbook PDFs, the database built from them and the model, so they can't run in the cloud: the books are copyrighted and stay on your own machine. With them included, coverage is 91% (measured for 1.1.1).
 
 ## Adding a book
 
@@ -193,7 +204,6 @@ Register the module in `books/__init__.py`, then add its title to `INGEST_BOOKS`
 
 ## Roadmap
 
-- **1.2.1:** check each answer against the excerpts it came from before showing it (every quantity is in the source, every cited book and page was among the sources given); reliability metrics from the saved chats and flags (how often the model is used rather than rules, model tool calls rejected, reply times, flags per version); a section of this README on reliability, evals and guardrails
 - **1.3.0:** show chat replies word by word, lay recipes out more readably on the website
 - **1.4.0:** a shopping list from the recipes you pick: their ingredients at the scale shown, combined across recipes, without pantry staples
 - **1.5.0 (tentative):** use the technique and "why" chapters of the books about cooking (Salt Fat Acid Heat, Flour Water Salt Yeast, Ratio, The Food Lab), and answer general cooking questions ("what's the difference between baking soda and baking powder?")
