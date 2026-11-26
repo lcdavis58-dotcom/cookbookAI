@@ -218,6 +218,26 @@ class AskPartialTest(unittest.TestCase):
                 self.assertEqual((result.kind, result.heading), ("choices", ask.DID_YOU_MEAN))
                 model.assert_not_called()
 
+    def test_every_recipe_of_the_dish_is_offered(self):
+        cookies = candidates_from_index([
+            entry("Chocolate Chip Cookies"), entry("Chocolate Chip Cookies", book="Book B"),
+            entry("Chewy Chocolate Chip Cookies"), entry("Brown Butter Chocolate Chip Cookies", book="Book B"),
+            entry("Sugar Cookies")])
+        found = mock.Mock(kind="match", matches=cookies[:2], more=0, rest=[], books=[], typos={}, clear=None, via={})
+        with mock.patch("actions.ask.retrieve", return_value=[]), \
+                mock.patch("actions.ask.within_distance", return_value=[]), \
+                mock.patch("actions.ask.find_recipes", return_value=(found, "index")), \
+                mock.patch("actions.ask.load_candidates", return_value=(cookies, "index")):
+            result = ask.run("show me a chocolate chip cookie recipe")
+            self.assertEqual(result.heading, "You have 4 recipes like that. Which one?")
+            self.assertEqual([c.title for c in result.choices[:2]], ["Chocolate Chip Cookies"] * 2)
+            self.assertEqual({c.title for c in result.choices[2:]},
+                             {"Chewy Chocolate Chip Cookies", "Brown Butter Chocolate Chip Cookies"})
+            # Only the closest exist: the usual "which one?".
+            found.matches = cookies[:2]
+            with mock.patch("actions.ask.load_candidates", return_value=(cookies[:2], "index")):
+                self.assertEqual(ask.run("show me a chocolate chip cookie recipe").heading, "")
+
     def test_a_named_book_limits_the_excerpts(self):
         result, model = self.ask("what goes with banana bread in the book on pie")
         self.assertEqual(result.kind, "nothing")
@@ -246,7 +266,9 @@ class ListingTest(unittest.TestCase):
 
     def test_nothing_found(self):
         with mock.patch("actions.ask.load_candidates", return_value=(CANDIDATES, "index")):
-            self.assertEqual(ask.list_recipes("lasagna", "lasagna").kind, "nothing")
+            result = ask.list_recipes("lasagna", "lasagna")
+        self.assertEqual(result.kind, "said")
+        self.assertEqual(result.heading, "I couldn't find a recipe with lasagna in its name.")
 
     def test_routing(self):
         for message, what in (("tell me what pumpkin pie recipes i have", "pumpkin pie"),

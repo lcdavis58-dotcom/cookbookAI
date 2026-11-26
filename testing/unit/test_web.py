@@ -199,7 +199,7 @@ class SendingTest(WebCase):
         page = self.page(f"/chats/{self.after_match().id}")
         self.assertRegex(page, r"""hx-vals='\{"message": "1"\}'""")
         self.assertRegex(page, r"""hx-vals='\{"message": "2"\}'""")
-        self.assertIn("without half and half", page)
+        self.assertIn("remove half and half", page)
         self.assertIn('aria-label="Remove pecan"', page)
         self.assertIn('name="add"', page)
         self.assertIn("Pie &lt;One&gt;", page)
@@ -208,8 +208,8 @@ class SendingTest(WebCase):
         chat = self.after_match(have=["it's <b>"])
         page = self.page(f"/chats/{chat.id}")
         self.assertNotIn("<b> ✕", page)
-        tapped = json.loads(re.search(r"hx-vals='(\{[^']*without[^']*\})'", page).group(1))
-        self.assertEqual(tapped["message"], "without it's <b>")
+        tapped = json.loads(re.search(r"hx-vals='(\{[^']*remove[^']*\})'", page).group(1))
+        self.assertEqual(tapped["message"], "remove it's <b>")
 
     def test_which_one_list_gets_numbers_only(self):
         chat = self.after_match()
@@ -217,7 +217,7 @@ class SendingTest(WebCase):
         store.save(chat, self.dir)
         page = self.page(f"/chats/{chat.id}")
         self.assertRegex(page, r"""hx-vals='\{"message": "1"\}'""")
-        self.assertNotIn("without", page)
+        self.assertNotIn("remove", page)
 
     def test_batch_question_gets_batch_buttons(self):
         chat = self.saved_chat()
@@ -225,6 +225,16 @@ class SendingTest(WebCase):
         store.save(chat, self.dir)
         page = self.page(f"/chats/{chat.id}")
         self.assertRegex(page, r"""hx-vals='\{"message": "Half Batch"\}'""")
+
+    def test_narrowing_question_gets_its_suggestions(self):
+        chat = self.saved_chat()
+        chat.focus.pending = Pending("narrow", "ask", "show me a cookie recipe",
+                                     ["chocolate chip", "from The Cookie Book", "show them all"], "cookie recipes")
+        store.save(chat, self.dir)
+        page = self.page(f"/chats/{chat.id}")
+        self.assertIn("Narrow it down", page)
+        for option in ("chocolate chip", "from The Cookie Book", "show them all"):
+            self.assertRegex(page, rf"""hx-vals='\{{"message": "{option}"\}}'""")
 
     def test_old_results_are_not_tappable_after_moving_on(self):
         chat = self.after_match()
@@ -244,7 +254,7 @@ class SendingTest(WebCase):
         self.answers.work = lambda directory, chat_id: self._reply_match(directory, chat_id)
         self.send(chat, "add butter")
         self.answers.join()
-        self.assertIn("without pecan", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
+        self.assertIn("remove pecan", self.client.get(f"/chats/{chat.id}/status").get_data(as_text=True))
 
     def _reply_match(self, directory, chat_id):
         chat = store.load(chat_id, directory)

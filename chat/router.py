@@ -10,6 +10,9 @@ in order (cheapest and most certain first):
                 going back to the recipe as written ("back to the original")
                 another batch size of the current recipe ("the mile-high batch")
                 scaling ("double it", "for 12 people", "I only have 1 egg")
+                a flavor or an ingredient filter ("pineapple flavored",
+                    "do any of these use half and half", "a pumpkin pie
+                    without half and half")
                 ingredients ("what can I make with ...", "add pecans",
                     "without the lemons", "pecans, cream cheese")
                 showing a recipe ("show me ...", "recipe for ...", a title)
@@ -34,11 +37,13 @@ from dataclasses import dataclass
 from actions.ask import DETAIL_RE, QUESTION_RE
 from actions.scale import find_batch, times, without_title_multipliers
 from books import strategy_for
+from chat import narrow
 from chat.state import Pending, resolve
 from common import cli, models
 from common.config import RECIPE_INDEX_PATH
 from match_utils.matching import parse_have
 from match_utils.recipe_index import load_index
+from match_utils.uses import load_groups
 from query_utils.retrieval import candidate_text
 from query_utils.title_lookup import (ASKING_WORDS, MAX_LISTED, REQUEST_WORDS, candidates_from_index, find_books,
                                       list_titles, lookup, title_tokens, word_forms)
@@ -112,6 +117,45 @@ LIST_RES = tuple(re.compile(p, re.I) for p in (
     r"^\s*(?:show(?:\s+me)?|list)\s+(?:(?:the|my)\s+)?(.+?)\s+recipes\b",
     r"^\s*all\s+(?:the\s+|my\s+)?(.+?)\s+recipes\s*[.!?]?\s*$",
 ))
+# Filtering by an ingredient (actions/filter.py). What a recipe does with
+# it, and what it doesn't: "use", "have", "call for"; "don't use",
+# "without", "with no".
+_USE = (r"(?:use|uses|using|used|have|has|contain|contains|call\s+for|calls\s+for|need|needs|include|includes|"
+        r"made\s+with|with)")
+_NOT_USE = (r"(?:(?:don'?t|doesn'?t|do\s+not|does\s+not|didn'?t)\s+(?:use|have|contain|call\s+for|need|include)|"
+            r"without|with\s+no|but\s+no|minus|free\s+of|no)")
+_LEAD = r"^\s*(?:(?:ok(?:ay)?|so|and|but|hmm|well|actually|no|please)[,\s]+)*"
+_INGREDIENT = r"(?:(?:any|a|an|the|some)\s+)?(?P<ing>[^,.?!]+?)(?:\s+in\s+(?:it|them|there))?\s*[.?!]*\s*$"
+# The list on screen: "do any of these 4 recipes use half and half",
+# "which ones don't have eggs", "the ones without nuts".
+_THESE = (r"(?:(?:any|all|some|which|none|one)\s+(?:of\s+)?(?:these|those|them|the\s+ones|ones|the\s+recipes)"
+          r"(?:\s+\d+)?(?:\s+recipes?)?|these(?:\s+\d+)?(?:\s+recipes?)?|those(?:\s+recipes?)?|they|the\s+ones|"
+          r"ones|which\s+ones?|which|any)")
+LIST_FILTER_RE = re.compile(
+    _LEAD + r"(?:(?:do|does|did|are|is|can)\s+)?(?:(?:show|give|list|tell)\s+(?:me\s+)?|just\s+|only\s+)?"
+    rf"{_THESE}\s+(?:that\s+|which\s+)?(?:(?:are|is)\s+)?(?:(?P<neg>{_NOT_USE})|(?P<pos>{_USE}))\s+" + _INGREDIENT,
+    re.I)
+# "without X" on its own, after a list.
+BARE_WITHOUT_RE = re.compile(_LEAD + r"(?:(?:what|how)\s+about\s+|only\s+|just\s+|(?:any|ones?)\s+)?"
+                             r"(?P<neg>without|with\s+no)\s+" + _INGREDIENT, re.I)
+# A dish and an ingredient: "a pumpkin pie without half and half", "do i
+# have a whipped cream recipe that uses chocolate".
+DISH_FILTER_RE = re.compile(
+    _LEAD + r"(?:(?:(?:do|did)\s+(?:i|we)\s+have|(?:is|are)\s+there|show\s+me|find(?:\s+me)?|give\s+me|"
+    r"i\s+(?:want|need)|i'?d\s+like|(?:can|could)\s+you\s+(?:show|find)(?:\s+me)?|list|got|any|i'?m\s+looking\s+for|"
+    r"looking\s+for)\s+)?(?:(?:a|an|any|some|my|all\s+(?:the|my)?)\s+)?"
+    rf"(?P<dish>[^,.?!]+?)\s+(?:recipes?\s+|ones?\s+)?(?:that\s+|which\s+)?(?:(?P<neg>{_NOT_USE})|(?P<pos>{_USE}))\s+"
+    + _INGREDIENT, re.I)
+# Narrowing a long list by an ingredient (chat/narrow.py): "with peanut
+# butter", "ones without nuts", "no eggs", "something with ginger".
+NARROW_FILTER_RE = re.compile(
+    _LEAD + r"(?:(?:a|an|the|some|ones?|any|something|anything|only|just)\s+)*(?:(?:that|which)\s+)?"
+    rf"(?:(?P<neg>{_NOT_USE})|(?P<pos>{_USE}))\s+" + _INGREDIENT, re.I)
+# A flavor: "something with a pineapple flavor", "pineapple-flavored".
+FLAVOR_RE = re.compile(r"(?P<f>(?:[\w'’]+[\s-]+){0,2}[\w'’]+)[\s-]+(?:flavou?red|flavou?rs?|tasting)\b", re.I)
+_FLAVOR_FILLER = frozenset("""with a an some something anything any the of that has like what i can make
+                              recipe recipes dessert desserts""".split())
+
 # Words no ingredient name has, so a comma message with one in any piece
 # is a sentence ("i don't like this one, show me the one from dessert
 # person"), not a list of what she has.
@@ -132,7 +176,8 @@ class Route:
                 "about" (a question about recipe), "list" (every recipe
                 with find_text in its title), "choose" (offer choices,
                 under text), "more" (the next part of a "which one?"
-                list: choices, numbered from first)
+                list: choices, numbered from first), "filter" (choices
+                that use ingredient, or don't if without; actions/filter.py)
                 scale: "find" (look up find_text, then scale), "recipe"
                 match: "run" (page: which part of the results, numbered
                 from first)
@@ -153,9 +198,13 @@ class Route:
     explanation: str = None
     text: str = ""
     pending: Pending = None
-    choices: list = None            # title_lookup.Candidate, for "choose" and "more"
+    choices: list = None            # title_lookup.Candidate, for "choose", "more" and "filter"
     page: int = 0
     first: int = 1
+    ingredient: str = ""            # for "filter": the ingredient, as she typed it
+    without: bool = False           # for "filter": the recipes without it
+    what: str = ""                  # for "filter": the dish named ("pumpkin pie"), "" for the last list
+    narrowing: str = ""             # what the recipes are, if there are too many ("cookie recipes")
 
     @property
     def label(self):
@@ -277,6 +326,42 @@ def same_recipe(a, b):
     return a is not None and b is not None and (a.book, a.title) == (b.book, b.title)
 
 
+_vocabulary = {"key": None, "words": frozenset()}
+
+
+def ingredient_vocabulary(candidates):
+    """Every form of every word in the recipes' ingredient names."""
+    if _vocabulary["key"] is not candidates:
+        words = set()
+        for c in candidates:
+            entry = c.payload or {}
+            for requirement in entry.get("ingredients", []) + entry.get("optional", []):
+                for option in requirement.get("options") or [requirement.get("name", "")]:
+                    for w in title_tokens(option):
+                        words |= word_forms(w)
+        _vocabulary.update(key=candidates, words=frozenset(words))
+    return _vocabulary["words"]
+
+
+def known_ingredient(text, candidates):
+    """The ingredient a filter names, tidied ("the half and half" -> "half
+    and half"), or None if it doesn't look like one: too long, a word no
+    ingredient has ("i", "recipe"), or a word no recipe's ingredients use
+    ("an oven", "a lattice top")."""
+    text = re.sub(r"^\s*(?:(?:any|a|an|the|some|my)\s+)+", "", text.strip(" .!?"), flags=re.I)
+    words = re.findall(r"[\w'’\-]+", text.lower())
+    if not 0 < len(words) <= MAX_INGREDIENT_WORDS or NOT_INGREDIENT_WORDS & set(words):
+        return None
+    names = parse_have(text)
+    if names and names[0] in load_groups():
+        return " ".join(text.split())      # "dairy", "nuts": a group (match_utils/uses.py)
+    vocabulary = ingredient_vocabulary(candidates)
+    tokens = title_tokens(text)
+    if not tokens or not all(word_forms(w) & vocabulary for w in tokens):
+        return None
+    return " ".join(text.split())
+
+
 # ---- routing --------------------------------------------------------------
 
 class Router:
@@ -349,12 +434,16 @@ class Router:
             route = self.scale_route("pending", recipe, pending.request, f"batch {name}", remember_as=pending.request)
             route.batch = name
             return route
+        if pending.kind == "narrow":
+            return self.narrow_answer(message, pending)
         if pending.kind in ("pick_recipe", "need_recipe"):
             n = list_number(message)
             if n is not None and self.focus.numbered:
                 found, problem = self.numbered_item(n, "pending")
                 return problem or self.finish(pending.action, found, pending.request, "pending", f"#{n}")
-            if pending.kind == "pick_recipe" and self.focus.numbered:
+            # A new filter ("chicken recipes with rice") isn't picking
+            # "Sweet-and-Sour Chicken" off the list by its name.
+            if pending.kind == "pick_recipe" and self.focus.numbered and not self.filter_rule(message):
                 choices = [c for c in (self.resolve(r) for r in self.focus.numbered.items if not r.gone) if c]
                 found = pick_from(message, choices)
                 if found is not None:
@@ -384,6 +473,10 @@ class Router:
             if scale_cues(message):
                 return self.scale_route("rule", found, message, f"#{n}")
             return Route("ask", "rule", f"show #{n}", mode="show", recipe=found, request=message)
+
+        filtered = self.filter_rule(message)
+        if filtered:
+            return filtered
 
         for pattern in LIST_RES:
             m = pattern.match(message)
@@ -464,7 +557,7 @@ class Router:
         """"more": the next page of the last match results, or the next
         part of the last "which one?" list, numbered on from it."""
         numbered = self.focus.numbered
-        if not MORE_RE.match(message) or numbered is None:
+        if numbered is None or not (MORE_RE.match(message) or (numbered.rest and narrow.SHOW_ALL_RE.match(message))):
             return None
         first = len(numbered.items) + 1
         if numbered.source == "match":
@@ -530,6 +623,112 @@ class Router:
         if not found:
             found = list_titles(" ".join(words), message, others)
         return self.show_or_choose(found, "other one", message, "Which one do you mean?")
+
+    def on_screen(self):
+        """The recipes of the last numbered list, including the part not
+        shown yet."""
+        numbered = self.focus.numbered
+        if not numbered:
+            return []
+        return [c for c in (self.resolve(r) for r in numbered.items + numbered.rest if not r.gone) if c]
+
+    def filter_route(self, how, ingredient, without, dish, message):
+        """A filter of the last list (dish empty) or of a dish's recipes,
+        or None when the ingredient or dish isn't one."""
+        ingredient = known_ingredient(ingredient, self.candidates)
+        if ingredient is None:
+            return None
+        sense = "without" if without else "with"
+        if dish:
+            # "the one with pineapple" picks from a list; "one" isn't a dish.
+            if not [w for w in title_tokens(dish) if not word_forms(w) & (NOT_INGREDIENT_WORDS | NOT_A_DISH)]:
+                return None
+            recipes = list_titles(dish, message, self.candidates)
+            if not recipes:
+                return None
+            what = " ".join(title_tokens(find_books(dish, {c.book for c in self.candidates})[1])) or dish
+            return Route("ask", how, f"filter {what} {sense} {ingredient}", mode="filter", choices=recipes,
+                         ingredient=ingredient, without=without, what=what, request=message)
+        recipes = self.on_screen()
+        if not recipes:
+            return Route("reply", how, "filter, no list",
+                         text=f"Which recipes should I check for {ingredient}? Name a dish, like "
+                              f'"a pumpkin pie without {ingredient}".')
+        return Route("ask", how, f"filter list {sense} {ingredient}", mode="filter", choices=recipes,
+                     ingredient=ingredient, without=without, request=message)
+
+    def narrow_answer(self, message, pending):
+        """Her answer to "want to narrow it down?", read inside the same
+        recipes (chat/narrow.py); None when it's plainly something else."""
+        pool = self.on_screen()
+        what = pending.what or "recipes"
+        if not pool:
+            return None
+        if narrow.SHOW_ALL_RE.match(message):
+            return Route("ask", "pending", "narrow, all", mode="choose", choices=pool,
+                         text=f"All {len(pool)} {what}:", request=pending.request, remember_as=pending.request)
+        m = NARROW_FILTER_RE.match(message)
+        if m:
+            ingredient = known_ingredient(m.group("ing"), self.candidates)
+            if ingredient:
+                without = bool(m.group("neg"))
+                route = Route("ask", "pending", f"narrow {'without' if without else 'with'} {ingredient}",
+                              mode="filter", choices=pool, ingredient=ingredient, without=without,
+                              request=message, remember_as=pending.request,
+                              narrowing=f"{what} {'without' if without else 'with'} {ingredient}")
+                return route
+        found = narrow.by_title_or_book(message, pool)
+        if found:
+            books, rest = find_books(message, {c.book for c in pool})
+            words = narrow.title_words(rest)
+            narrowing = " ".join(filter(None, [words, what])) + (f" from {' or '.join(books)}" if books else "")
+            return Route("ask", "pending", f"narrow {words or books}", mode="choose", choices=found,
+                         text=f"{len(found)} {narrowing}. Which one?", request=message,
+                         remember_as=pending.request, narrowing=narrowing)
+        # Plainly something else ("double the pie crust"): the usual rules.
+        if self.from_rules(message):
+            return None
+        said = narrow.title_words(message) or message.strip()
+        return Route("reply", "pending", "narrow, none", pending=pending,
+                     text=f"None of your {what} are {said}. Try another word, a book, or \"show them all\".")
+
+    def filter_rule(self, message):
+        """A flavor ("something pineapple flavored"), a filter of the list
+        on screen ("do any of these use half and half", "without nuts"),
+        or a dish and an ingredient ("a pumpkin pie without half and
+        half"). Answered from the recipe index, no model call."""
+        if scale_cues(message):
+            return None
+        m = FLAVOR_RE.search(message)
+        if m:
+            words = [w for w in title_tokens(m.group("f")) if w not in _FLAVOR_FILLER]
+            if words:
+                return Route("ask", "rule", "flavor", mode="list", find_text=" ".join(words), request=message)
+        m = LIST_FILTER_RE.match(message)
+        if m:
+            route = self.filter_route("rule", m.group("ing"), bool(m.group("neg")), "", message)
+            if route:
+                return route
+        m = BARE_WITHOUT_RE.match(message)
+        if m and self.focus.numbered:
+            drop = clean_items(m.group("ing"))
+            # Taking one of her searched ingredients away is the match
+            # rule's ("without the pecans", the ✕ on a tag sends "remove").
+            if not (self.focus.have and drop and all(d in self.focus.have for d in drop)):
+                route = self.filter_route("rule", m.group("ing"), True, "", message)
+                if route:
+                    return route
+        m = DISH_FILTER_RE.match(message)
+        if m and not MATCH_NEW_RE.match(message) and not I_HAVE_RE.match(message):
+            named = lookup(message, self.candidates)
+            # "the pumpkin pie with pecan crunch" is a title, not a filter.
+            def plain(text):
+                return " " + " ".join(re.findall(r"[a-z0-9]+", text.lower())) + " "
+            said = plain(f"{m.group('pos') or m.group('neg')} {m.group('ing')}")
+            if named.kind == "match" and any(said in plain(c.title) for c in named.matches):
+                return None
+            return self.filter_route("rule", m.group("ing"), bool(m.group("neg")), m.group("dish"), message)
+        return None
 
     def match_rule(self, message, named_one):
         have = self.focus.have
@@ -638,6 +837,17 @@ class Router:
             if not items:
                 return Route("reply", "model", f"{detail} empty", text="Which ingredients do you have?")
             return Route("match", "model", f"{mode} {items}", mode="run", request=", ".join(items))
+        if name == "filter_recipes":
+            dish = str(args.get("dish") or "").strip()
+            if dish.lower() in ("none", "these", "the last list", "last list", "list"):
+                dish = ""
+            without = args.get("without")
+            without = without if isinstance(without, bool) else str(without).lower() == "true"
+            route = self.filter_route("model", str(args.get("ingredient") or ""), without, dish, message)
+            # "what goes well with pumpkin pie?" once came back as a
+            # filter with no ingredient in it: a question, so answer it.
+            return route or Route("ask", "model", f"{detail}, not an ingredient or dish, so answered",
+                                  mode="find", find_text=message, request=message)
         if name not in ("find_or_answer", "scale_recipe"):
             return Route("reply", "model", f"unknown tool {name!r}", text=NOT_SURE)
 
@@ -731,6 +941,17 @@ ROUTER_TOOLS = [
             "mode": {"type": "string", "enum": ["new", "add", "remove"],
                      "description": "new: only these; add or remove: change the last ingredients searched."},
         }, "required": ["ingredients", "mode"]}}},
+    {"type": "function", "function": {
+        "name": "filter_recipes",
+        "description": "Find recipes that use an ingredient, or that don't: from the last numbered list "
+                       "(\"do any of these use butter\") or from every recipe of a dish (\"a pumpkin pie "
+                       "without half and half\"). Only when she names an ingredient to have or leave out.",
+        "parameters": {"type": "object", "properties": {
+            "ingredient": {"type": "string"},
+            "without": {"type": "boolean", "description": "True for the recipes that don't use it."},
+            "dish": {"type": "string",
+                     "description": 'The dish to look through ("pumpkin pie"), or "" for the last numbered list.'},
+        }, "required": ["ingredient", "without", "dish"]}}},
     {"type": "function", "function": {
         "name": "ask_user",
         "description": "Ask her one short question when the message is unclear.",

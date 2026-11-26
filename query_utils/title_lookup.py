@@ -501,10 +501,31 @@ def _kind_recipes(words, candidates):
     return []
 
 
+def _dish_type_spans(words):
+    """(type, start, end) for each dish type (match_utils/dish_labels.py)
+    the words name: "chocolate chip cookies" names "cookie" at 2-3. Only
+    the type's own name: "snickerdoodle" is one of the cookie type's
+    title words, but asking for one isn't asking for every cookie, nor
+    "brownies" for every bar."""
+    from match_utils.dish_labels import load_types  # imported late: it imports this module
+    spans = []
+    for name in load_types():
+        tokens = title_tokens(name)
+        n = len(tokens)
+        if n:
+            for start in range(len(words) - n + 1):
+                if all(word_forms(a) & word_forms(b) for a, b in zip(words[start:start + n], tokens)):
+                    spans.append((name, start, start + n))
+    return spans
+
+
 def list_titles(what, question, candidates):
     """Every recipe whose title has all the words of what ("pumpkin pie"),
-    or that's of the kind what names, by book. A book named anywhere in
-    the question limits it to that book."""
+    or that's of the kind what names, by book. A word naming a dish type
+    is also met by the recipe's dish labels (index "dishes"), so "cookies"
+    lists "Brown Butter Snickerdoodles" and "chocolate chip cookies" the
+    cookies with "chocolate chip" in their titles. A book named anywhere
+    in the question limits it to that book."""
     title_words = {form for c in candidates for core, extra in c.variants
                    for w in core + extra for form in word_forms(w)}
     named_books, _ = find_books(question, {c.book for c in candidates}, title_words)
@@ -520,13 +541,20 @@ def list_titles(what, question, candidates):
     if joined != words:
         readings.append(joined)
 
-    def has_all(candidate):
+    def has_all(candidate, reading_words=None):
         return any(all(_with_same_words(word_forms(w)) & {f for t in core + extra for f in word_forms(t)}
                        for w in reading)
-                   for core, extra in candidate.variants for reading in readings)
+                   for core, extra in candidate.variants
+                   for reading in ([reading_words] if reading_words is not None else readings))
 
+    def labeled(candidate):
+        dishes = (candidate.payload or {}).get("dishes") or []
+        return any(dish in dishes and has_all(candidate, words[:start] + words[end:])
+                   for dish, start, end in spans)
+
+    spans = _dish_type_spans(words)
     found = {c.key: c for c in _kind_recipes(words, in_books)}
-    found.update((c.key, c) for c in in_books if has_all(c))
+    found.update((c.key, c) for c in in_books if has_all(c) or (spans and labeled(c)))
     return sorted(found.values(), key=lambda c: (c.book, c.title))
 
 

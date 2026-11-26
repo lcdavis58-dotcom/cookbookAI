@@ -8,9 +8,12 @@ reply, how it was routed and how long each model call took.
 from dataclasses import dataclass
 
 from actions import ask, match, scale
-from chat import reply, store
+from actions import filter as recipe_filter
+from actions.ask import MAX_LISTED
+from chat import narrow, reply, store
 from chat.router import Router
-from chat.state import remember
+from chat.state import Numbered, Pending, _as_ref, remember
+from query_utils.title_lookup import ASKING_WORDS, title_tokens, word_forms
 from common import models
 from common.config import CHATS_DIR
 
@@ -33,9 +36,15 @@ def run_route(router, route):
         if route.mode == "list":
             return ask.list_recipes(route.find_text, route.request)
         if route.mode == "choose":
-            return ask.AskResult("choices", route.request, choices=route.choices, heading=route.text)
+            choices = route.choices
+            return ask.AskResult("choices", route.request, choices=choices[:MAX_LISTED], heading=route.text,
+                                 rest=choices[MAX_LISTED:], more=len(choices[MAX_LISTED:]))
         if route.mode == "more":
             return ask.more(route.choices, route.first)
+        if route.mode == "filter":
+            return recipe_filter.run(route.choices, route.ingredient, route.without, route.what,
+                                     index=[c.payload for c in router.candidates if c.payload],
+                                     question=route.request)
         return ask.run(route.find_text)
     if route.action == "scale":
         if route.mode == "find":
@@ -50,6 +59,38 @@ def run_route(router, route):
     return result
 
 
+def narrowing(route, result):
+    """What a list's recipes are, for asking her to narrow it down ("cookie
+    recipes"), or None when the list isn't too long to show."""
+    if route.action != "ask" or result.kind != "choices" or result.start > 1 or route.detail == "narrow, all":
+        return None
+    if len(result.choices) + len(result.rest) <= narrow.NARROW_OVER:
+        return None
+    if route.narrowing:
+        return route.narrowing
+    if route.mode == "list":
+        return f"{route.find_text.strip()} recipes"
+    if route.mode == "filter":
+        sense = "without" if route.without else "with"
+        return f"{route.what + ' recipes' if route.what else 'recipes'} {sense} {route.ingredient}"
+    # "show me a cookie recipe": the dish is the words she typed that
+    # aren't just asking for it.
+    dish = " ".join(w for w in title_tokens(route.find_text or route.request) if not word_forms(w) & ASKING_WORDS)
+    return f"{dish} recipes" if dish else "recipes like that"
+
+
+def ask_to_narrow(state, route, result, what):
+    """The reply asking her to narrow a long list down, with the recipes
+    kept (focus.numbered.rest) to read her answer against."""
+    pool = result.choices + result.rest
+    dish = " ".join(w for w in title_tokens(what) if w not in ("recipes", "recipe", "these", "without"))
+    words, books = narrow.suggest(pool, dish)
+    focus = state.focus
+    focus.numbered = Numbered("narrow", [], [_as_ref(c) for c in pool])
+    focus.pending = Pending("narrow", "ask", route.remember_as or route.request, narrow.options(words, books), what)
+    return TurnResult(narrow.question(len(pool), what, words, books), "ask", result, route)
+
+
 def respond(state, message, candidates=None):
     """Route and answer a message, updating state (not saving it)."""
     router = Router(state, candidates)
@@ -59,6 +100,9 @@ def respond(state, message, candidates=None):
             state.focus.pending = route.pending
         return TurnResult(route.text, route=route)
     result = run_route(router, route)
+    what = narrowing(route, result)
+    if what:
+        return ask_to_narrow(state, route, result, what)
     remember(state, route.action, route.remember_as or route.request, result)
     return TurnResult(reply.render(route.action, result), route.action, result, route)
 

@@ -33,8 +33,10 @@ def ask_reply(result):
         if result.start > 1:
             heading = "More of them:"
         lines += [heading + "\n",
-                  *_numbered(result.choices, result.more, lambda c: ask.choice_label(result, c), result.start),
-                  f"\n{PICK_HINT}"]
+                  *_numbered(result.choices, result.more, lambda c: ask.choice_label(result, c), result.start)]
+        if result.footer:
+            lines.append(result.footer)
+        lines.append(f"\n{PICK_HINT}")
     elif result.kind == "answer":
         sources = []
         for h in result.sources:
@@ -42,6 +44,8 @@ def ask_reply(result):
             if source not in sources:
                 sources.append(source)
         lines += [result.answer, f"\n(From {'; '.join(sources)})"]
+    elif result.kind == "said":
+        lines.append(result.heading)
     else:
         lines.append("I couldn't find anything relevant to that in your cookbooks.")
     return "\n".join(lines)

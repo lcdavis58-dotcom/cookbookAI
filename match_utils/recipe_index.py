@@ -28,6 +28,11 @@ Entry shape:
     your_choice   required placeholders that can't be matched ("prepared
                   fruit" in an any-fruit recipe), shown, never counted
     groups        group name -> batch / component / optional
+    dishes        the dish types it is ("cookie", "pie"), from the chat
+                  model and the title (match_utils/dish_labels.py); an
+                  index built before 1.2.0 has none
+    chapter       the chapter it's in, from the PDF's table of contents
+                  (match_utils/chapters.py); none without the PDF
 """
 
 import json
@@ -134,11 +139,25 @@ def index_entry(recipe_id, recipe):
     }
 
 
-def build_index():
+def build_index(label=True):
     """The index for every recipe in the database, sorted by book, then
-    title."""
-    entries = [e for e in (index_entry(key, r) for key, r in load_recipes().items()) if e]
+    title. label=False skips the dish labels (match_utils/dish_labels.py),
+    which ask the chat model about new or changed recipes."""
+    recipes = load_recipes()
+    entries = [e for e in (index_entry(key, r) for key, r in recipes.items()) if e]
     link_sub_recipes(entries)
+    from match_utils.chapters import add_chapters  # imported late: it imports title lookup
+    add_chapters(entries)
+    if label:
+        from match_utils import dish_labels
+        # With SHOW_HEADNOTE the model reads each recipe's headnote too;
+        # it isn't kept in the index, which holds no book text.
+        if dish_labels.SHOW_HEADNOTE:
+            for e in entries:
+                e["headnote"] = dish_labels.headnote(recipes[e["recipe_id"]]["text"], e["title"])
+        dish_labels.label_dishes(entries)
+        for e in entries:
+            e.pop("headnote", None)
     return sorted(entries, key=lambda e: (e["book"], e["title"].lower()))
 
 
@@ -206,4 +225,6 @@ def summarize(entries):
     lines.append(f"  {choices} ingredient choices (\"X or Y\") split into options")
     variations = sum(len(e.get("variations", [])) for e in entries)
     lines.append(f"  {variations} variations named, in {sum(1 for e in entries if e.get('variations'))} recipes")
+    lines.append(f"  {sum(1 for e in entries if e.get('dishes'))} with a dish type, "
+                 f"{sum(1 for e in entries if e.get('chapter'))} with a chapter")
     return lines

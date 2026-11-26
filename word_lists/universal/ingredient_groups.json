@@ -1,0 +1,13 @@
+{
+  "_comment": "Words that name a group of ingredients, for filtering a list (match_utils/uses.py): 'without nuts' leaves out a recipe with walnuts, 'with dairy' finds one with butter. Each member is matched the way a typed ingredient is (its kinds count: 'cheese' finds 'parmesan cheese'; ingredient_varieties.json still keeps 'peanut butter' out of 'butter' and 'coconut milk' out of 'milk'). Keys are the normalized form of what she types (singular). Leans towards matching more; a member that shouldn't be here can be taken out when a flagged reply shows it. Lowercase.",
+  "groups": {
+    "nut": ["nut", "walnut", "pecan", "almond", "hazelnut", "pistachio", "cashew", "macadamia", "pine nut", "peanut", "brazil nut", "praline", "marzipan", "almond paste", "almond flour", "nut butter", "peanut butter", "almond butter", "nutella"],
+    "tree nut": ["walnut", "pecan", "almond", "hazelnut", "pistachio", "cashew", "macadamia", "pine nut", "brazil nut", "marzipan", "almond paste", "almond flour", "almond butter", "nutella"],
+    "dairy": ["milk", "butter", "cream", "cheese", "yogurt", "buttermilk", "sour cream", "cream cheese", "half-and-half", "crème fraîche", "creme fraiche", "mascarpone", "ricotta", "ghee", "whey", "kefir", "ice cream", "whipped cream", "sweetened condensed milk", "evaporated milk", "milk powder", "nonfat dry milk"],
+    "gluten": ["flour", "bread", "bread crumb", "panko", "pasta", "noodle", "couscous", "bulgur", "farro", "barley", "rye", "spelt", "semolina", "graham cracker", "cookie", "cracker", "phyllo", "puff pastry", "wheat", "malt", "seitan"],
+    "meat": ["beef", "pork", "lamb", "veal", "bacon", "ham", "sausage", "prosciutto", "pancetta", "salami", "chorizo", "chicken", "turkey", "duck", "steak", "ground beef", "short rib"],
+    "seafood": ["fish", "salmon", "tuna", "cod", "halibut", "shrimp", "crab", "lobster", "scallop", "clam", "mussel", "oyster", "anchovy", "sardine", "fish sauce"],
+    "shellfish": ["shrimp", "crab", "lobster", "scallop", "clam", "mussel", "oyster"],
+    "alcohol": ["wine", "beer", "rum", "bourbon", "whiskey", "brandy", "vodka", "gin", "tequila", "liqueur", "sherry", "cognac", "kirsch", "amaretto", "grand marnier", "vermouth", "marsala", "sake", "mirin"]
+  }
+}

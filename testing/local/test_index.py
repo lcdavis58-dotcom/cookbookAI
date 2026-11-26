@@ -115,5 +115,48 @@ class MoreAndOrderTest(unittest.TestCase):
         self.assertEqual(len(state.focus.numbered.items), 30)
 
 
+@needs_index
+class DishAndFilterTest(unittest.TestCase):
+    """1.2.0: dish labels, filtering by an ingredient, narrowing."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.index = load_index()
+
+    def test_nearly_every_recipe_has_a_dish_type(self):
+        # Fails on an index built before 1.2.0, or with the model down
+        # for most of the build (tools/build_recipe_index.py).
+        labeled = sum(1 for e in self.index if e.get("dishes"))
+        self.assertGreater(labeled, 0.95 * len(self.index))
+
+    def test_titles_that_name_a_type_have_it(self):
+        by_title = {e["title"]: e for e in self.index}
+        for title, dish in (("Brown Butter Chocolate Chip Cookies", "cookie"), ("Pumpkin Pie", "pie"),
+                            ("Classic Guacamole", "dip")):
+            with self.subTest(title=title):
+                self.assertIn(dish, by_title[title]["dishes"])
+
+    def test_pumpkin_pies_and_half_and_half(self):
+        state = ChatState.new()
+        turn.respond(state, "what pumpkin pie recipes do i have")
+        uses = turn.respond(state, "do any of these use half and half")
+        self.assertEqual(len(uses.result.choices), 2)
+        without = turn.respond(ChatState.new(), "a pumpkin pie without half and half")
+        self.assertEqual(len(without.result.choices), 5)
+
+    def test_a_dish_type_finds_untitled_recipes(self):
+        found = {c.title for c in ask.list_recipes("cookie", "what cookie recipes do i have").choices}
+        self.assertIn("Snickerdoodles", found)
+        self.assertGreater(len(found), 150)
+
+    def test_long_lists_ask_to_narrow(self):
+        state = ChatState.new()
+        reply = turn.respond(state, "show me a cookie recipe")
+        self.assertIn("Want to narrow it down?", reply.text)
+        narrowed = turn.respond(state, "a chocolate chip one")
+        self.assertLessEqual(len(narrowed.result.choices) + len(narrowed.result.rest), 30)
+        self.assertIn("Chocolate Chip Cookies", {c.title for c in narrowed.result.choices + narrowed.result.rest})
+
+
 if __name__ == "__main__":
     unittest.main()

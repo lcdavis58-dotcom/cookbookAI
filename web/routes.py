@@ -93,12 +93,15 @@ def quick_replies(chat):
     she could have typed:
         numbers     (n, recipe) for a "which one?" list or match results
         batches     the batch sizes it's asking her to pick from
+        narrow      ways to narrow a long list down (chat/narrow.py)
         have        the ingredients just searched, to remove or add to"""
     if not chat.messages or chat.messages[-1].role != "assistant":
         return {}
     focus, action = chat.focus, chat.messages[-1].action
     if focus.pending and focus.pending.kind == "pick_batch":
         return {"batches": focus.pending.options}
+    if focus.pending and focus.pending.kind == "narrow":
+        return {"narrow": focus.pending.options}
     numbered = list(enumerate(focus.numbered.items, 1)) if focus.numbered else []
     if focus.pending and focus.pending.kind == "pick_recipe":
         return {"numbers": numbered}
