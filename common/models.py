@@ -29,20 +29,36 @@ def is_timeout(error):
     return isinstance(error, TimeoutError) or type(error).__name__ in ("ReadTimeout", "WriteTimeout", "PoolTimeout")
 
 
-def chat(job, messages, tools=None, options=None):
+def chat(job, messages, tools=None, options=None, format=None, model=None):
     """ollama.chat with CHAT_MODEL. job names what the call is for
-    ("route", "answer", "scale intent"). Every call gets the same context
-    size (CHAT_CONTEXT), so the model is never reloaded between them.
-    Returns (response, seconds)."""
+    ("route", "answer", "scale intent", "dish labels"). Every call gets
+    the same context size (CHAT_CONTEXT), so the model is never reloaded
+    between them. format="json" asks for a JSON reply. model overrides
+    CHAT_MODEL for a job that runs once, not while she waits (the dish
+    labels, LABEL_MODEL). Returns (response, seconds)."""
     global _client
     if _client is None:
         _client = ollama.Client(timeout=MODEL_TIMEOUT)
     options = {**(options or {}), "num_ctx": CHAT_CONTEXT}
     t0 = time.time()
-    response = _client.chat(model=CHAT_MODEL, messages=messages, tools=tools, options=options)
+    extra = {"format": format} if format else {}
+    model = model or CHAT_MODEL
+    response = _client.chat(model=model, messages=messages, tools=tools, options=options, **extra)
     seconds = time.time() - t0
-    CALLS.append({"job": job, "model": CHAT_MODEL, "seconds": round(seconds, 2)})
+    CALLS.append({"job": job, "model": model, "seconds": round(seconds, 2)})
     return response, seconds
+
+
+def installed(name):
+    """Whether Ollama has the model pulled: True, False, or None when
+    Ollama can't be reached."""
+    try:
+        listing = ollama.Client(timeout=5).list()
+    except Exception:  # noqa: BLE001 - not reachable, whatever the reason
+        return None
+    names = {getattr(m, "model", None) or (m.get("model") if isinstance(m, dict) else None)
+             for m in (getattr(listing, "models", None) or listing.get("models", []))}
+    return name in names or f"{name}:latest" in names
 
 
 def clear():

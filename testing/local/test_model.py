@@ -114,7 +114,8 @@ class AnswerTest(unittest.TestCase):
         result = ask.run("show me a pumpkin pie recipe")
         self.assertEqual(result.kind, "choices")
         self.assertEqual(sorted(c.title for c in result.choices),
-                         ["Classic Pumpkin Pie", "Pumpkin Pie", "Pumpkin Pie", "Pumpkin Pie with Pecan Crunch"])
+                         ["Butternut Pumpkin Pie", "Caramelized Honey Pumpkin Pie", "Classic Pumpkin Pie",
+                          "Five-Spice Pumpkin Pie", "Pumpkin Pie", "Pumpkin Pie", "Pumpkin Pie with Pecan Crunch"])
 
     @needs_model
     def test_answers_from_the_books(self):

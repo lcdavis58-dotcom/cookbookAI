@@ -157,10 +157,19 @@ class BuildIndexTest(unittest.TestCase):
         recipes = {"b": recipe(PEAR_PIE), "a": recipe(GALETTE), "skip": recipe(GALETTE, book="No Module")}
         with mock.patch.object(recipe_index, "load_recipes", return_value=recipes), \
                 mock.patch.object(recipe_index, "link_sub_recipes") as link:
-            entries = recipe_index.build_index()
+            with mock.patch("match_utils.chapters.add_chapters"):
+                entries = recipe_index.build_index(label=False)
         self.assertEqual([e["title"] for e in entries], ["Test Fruit Galette", "Test Pear Pie with Oat Crumble"])
         link.assert_called_once()
         self.assertEqual(len(link.call_args.args[0]), 2)
+
+    def test_dish_labels_are_added(self):
+        recipes = {"a": recipe(GALETTE)}
+        with mock.patch.object(recipe_index, "load_recipes", return_value=recipes),                 mock.patch("match_utils.chapters.add_chapters") as chapters,                 mock.patch("match_utils.dish_labels.label_dishes") as label:
+            entries = recipe_index.build_index()
+        label.assert_called_once_with(entries)
+        chapters.assert_called_once_with(entries)
+        self.assertNotIn("headnote", entries[0])
 
 
 def entry(title, ingredients=(), optional=(), book=BOOK):
@@ -212,6 +221,7 @@ class SummarizeTest(unittest.TestCase):
             "  1 with no required ingredients: Toast",
             '  1 ingredient choices ("X or Y") split into options',
             "  0 variations named, in 0 recipes",
+            "  0 with a dish type, 0 with a chapter",
         ])
 
     def test_long_list_is_cut_short(self):

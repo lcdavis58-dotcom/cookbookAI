@@ -92,6 +92,8 @@ class AskResult:
                     sources (the hits it was given), generation_time;
                     from about(), recipe is the one recipe it was given
         "nothing"   nothing in the books is close to the question
+        "said"      a plain answer in heading, no recipes (actions/filter.py:
+                    "None of these use half and half.")
     warnings are problems worth showing whatever the kind (a recipe in the
     index but not the database)."""
     kind: str
@@ -109,6 +111,8 @@ class AskResult:
     rest: list = field(default_factory=list)  # for "choices": the ones past those shown, for "more"
     start: int = 1                  # for "choices": the number of the first one (a later page)
     via: dict = field(default_factory=dict)   # recipe key -> the variation it was found through
+    notes: dict = field(default_factory=dict)  # recipe key -> a note shown after it ("optional")
+    footer: str = ""                # for "choices": said after the list ("The other 3 don't.")
 
 
 def build_context(hits):
@@ -167,6 +171,13 @@ def run(question):
         warnings.append(_stale(c))
 
     if len(header_matches) > 1:
+        if wants:
+            # "show me a chocolate chip cookie recipe": every recipe of the
+            # dish, not just the titles closest to the words typed (2 of 15).
+            # The closest still come first.
+            widened = _every_one_of_the_dish(question, header_matches + found.rest)
+            if widened:
+                return widened
         return AskResult("choices", question, choices=header_matches, more=found.more, via=found.via,
                          rest=found.rest)
 
@@ -192,6 +203,20 @@ def run(question):
     answer, seconds = _answer(user_prompt)
     return AskResult("answer", question, answer=answer, sources=llm_hits,
                      generation_time=seconds, warnings=warnings)
+
+
+def _every_one_of_the_dish(question, closest):
+    """A "which one?" list of every recipe with the dish's words in its
+    title or labels (title_lookup.list_titles), the closest first; None
+    when that adds nothing to closest."""
+    candidates, _ = load_candidates([])
+    seen = {c.key for c in closest}
+    extra = [c for c in list_titles(question, question, candidates) if c.key not in seen]
+    if not extra:
+        return None
+    every = closest + extra
+    return AskResult("choices", question, choices=every[:MAX_LISTED], more=len(every[MAX_LISTED:]),
+                     rest=every[MAX_LISTED:], heading=f"You have {len(every)} recipes like that. Which one?")
 
 
 def _closest(question, found):
@@ -232,7 +257,7 @@ def list_recipes(what, question):
     candidates, _ = load_candidates([])
     found = list_titles(what, question, candidates)
     if not found:
-        return AskResult("nothing", question)
+        return AskResult("said", question, heading=f"I couldn't find a recipe with {what.strip()} in its name.")
     plural = "" if len(found) == 1 else "s"
     return AskResult("choices", question, choices=found, heading=f"You have {len(found)} {what.strip()} recipe{plural}:")
 
@@ -303,7 +328,9 @@ def variation_note(result):
 def choice_label(result, candidate):
     """A listed recipe's title, plus the variation it was listed for."""
     name = result.via.get(candidate.key)
-    return f"{candidate.title} (its {name} variation)" if name else candidate.title
+    label = f"{candidate.title} (its {name} variation)" if name else candidate.title
+    note = result.notes.get(candidate.key)
+    return f"{label} - {note}" if note else label
 
 
 def render(result):
@@ -324,6 +351,8 @@ def render(result):
                   for i, c in enumerate(choices, 1)]
         if result.more:
             lines.append(f"  ...and {result.more} more.")
+        if result.footer:
+            lines.append(result.footer)
         first = choices[0]
         # The same name in two books: naming the book picks one.
         same_name = sum(c.title.lower() == first.title.lower() for c in choices) > 1
@@ -333,6 +362,8 @@ def render(result):
                   "\n(matched instantly, no generation needed)"]
     elif result.kind == "nothing":
         lines.append("I couldn't find anything relevant to that in your cookbooks.")
+    elif result.kind == "said":
+        lines.append(result.heading)
     elif result.kind == "answer":
         lines += [result.answer,
                   f"\n(generation took {result.generation_time:.2f}s)",

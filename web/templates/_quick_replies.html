@@ -26,11 +26,21 @@
   </div>
   {% endif %}
 
+  {% if status.quick.narrow %}
+  <p class="quick-label">Narrow it down</p>
+  <div class="quick-row">
+    {% for option in status.quick.narrow %}
+      {{ tap(url, option, option) }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if status.quick.have %}
   <p class="quick-label">Your ingredients</p>
   <div class="quick-row">
     {% for item in status.quick.have %}
-      {{ tap(url, item ~ " ✕", "without " ~ item, class="tag", name="Remove " ~ item) }}
+      {# "remove", not "without": "without X" can also filter a list (1.2.0). #}
+      {{ tap(url, item ~ " ✕", "remove " ~ item, class="tag", name="Remove " ~ item) }}
     {% endfor %}
   </div>
   <form id="add-ingredient" class="quick-row" hx-post="{{ url }}">

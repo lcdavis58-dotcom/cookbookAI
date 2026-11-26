@@ -1,13 +1,17 @@
 {
-  "_comment": "When someone lists a general name ('butter', 'cheese', 'milk'), matching takes any ingredient ending in that name as a variety of it ('unsalted butter', 'parmesan cheese', 'whole milk') and says so in the result. These are the names that end the same way but are different foods, so they're never taken as varieties: listing 'cheese' doesn't mean having cream cheese. Matched against the end of an ingredient name, so 'nut butter' also covers 'smooth nut butter'. Add pairs as they come up.",
+  "_comment": "When someone lists a general name ('butter', 'cheese', 'milk'), matching takes any ingredient ending in that name as a variety of it ('unsalted butter', 'parmesan cheese', 'whole milk') and says so in the result. These are the names that end the same way but are different foods, so they're never taken as varieties: listing 'cheese' doesn't mean having cream cheese. Matched against the end of an ingredient name, so 'nut butter' also covers 'smooth nut butter'. Add pairs as they come up. Filtering a list by an ingredient (match_utils/uses.py) is looser, taking any ingredient with the name's words in it ('chocolate chips' for 'chocolate'), so these are also matched anywhere in a name there: 'cream cheese' is never 'cream'.",
   "not_varieties": {
-    "butter": ["peanut butter", "nut butter", "almond butter", "apple butter", "cookie butter", "cocoa butter", "cashew butter"],
+    "butter": ["peanut butter", "nut butter", "almond butter", "apple butter", "cookie butter", "cocoa butter", "cashew butter", "butter lettuce", "butter beans"],
     "cheese": ["cream cheese"],
-    "cream": ["ice cream", "sour cream", "whipped cream", "coconut cream"],
-    "milk": ["coconut milk", "almond milk", "oat milk", "soy milk", "sweetened condensed milk", "malted milk", "nonfat dry milk"],
+    "cream": ["ice cream", "sour cream", "whipped cream", "coconut cream", "cream cheese", "cream of tartar", "cream soda"],
+    "milk": ["coconut milk", "almond milk", "oat milk", "soy milk", "sweetened condensed milk", "malted milk", "nonfat dry milk", "milk chocolate", "milk powder"],
     "oil": ["lemon oil", "coconut oil"],
     "flour": ["almond flour", "coconut flour", "rice flour", "buckwheat flour", "rye flour", "spelt flour", "flax meal"],
     "water": ["orange blossom water", "rose water", "tonic water"],
-    "pepper": ["red bell pepper", "yellow bell pepper", "bell pepper", "cayenne pepper", "peppadew pepper", "aleppo pepper"]
+    "pepper": ["red bell pepper", "yellow bell pepper", "bell pepper", "cayenne pepper", "peppadew pepper", "aleppo pepper", "pepper jack"],
+    "chocolate": ["white chocolate"],
+    "corn": ["corn syrup", "corn flakes", "cornflakes"],
+    "egg": ["egg noodles", "egg roll wrappers"],
+    "peanut": ["peanut oil"]
   }
 }

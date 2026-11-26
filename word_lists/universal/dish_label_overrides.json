@@ -1,0 +1,5 @@
+{
+ "_comment": "Dish types set by hand for recipes the labels got wrong in real use (match_utils/dish_labels.py load_overrides). Each replaces the model's and the rules' types for that title in that book, and survives every relabel; 'implies' still adds meat and dip. Added from reviewed flags (tools/flagged.py), each with a regression test. Recipes in testing/evals/dish_label_key.json or dish_label_holdout.json are skipped when those are scored, so the scores still measure the labeling. Titles and types only (public repository).",
+ "recipes": [
+ ]
+}

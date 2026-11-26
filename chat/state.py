@@ -81,12 +81,16 @@ class Numbered:
 class Pending:
     """A question the chat asked. kind is "pick_recipe" (the choices are
     focus.numbered), "pick_batch" (options are the batch names, for
-    focus.recipe) or "need_recipe" (a request like "double it" with no
-    recipe to apply it to). request is the message the question is about."""
+    focus.recipe), "need_recipe" (a request like "double it" with no
+    recipe to apply it to) or "narrow" (too many recipes to list: they're
+    focus.numbered.rest, what names them, "cookie recipes", and options
+    are the suggestions, chat/narrow.py). request is the message the
+    question is about."""
     kind: str
     action: str
     request: str
     options: list = field(default_factory=list)
+    what: str = ""                  # for "narrow"; optional in saved chats (added in 1.2.0)
 
 
 @dataclass

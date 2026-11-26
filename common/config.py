@@ -21,6 +21,9 @@ CHROMA_PATH = os.path.join(DATA_DIR, "chroma_db")
 # Built from the database at the end of every ingest (and by
 # tools/build_recipe_index.py), see match_utils/recipe_index.py.
 RECIPE_INDEX_PATH = os.path.join(DATA_DIR, "recipe_index.json")
+# The dish types the chat model gave each recipe (match_utils/
+# dish_labels.py), kept so a rebuild only asks about recipes that changed.
+DISH_LABELS_PATH = os.path.join(DATA_DIR, "dish_labels.json")
 # Saved PDF extractions (ingest_utils/extract.py). They quote the books,
 # so like chroma_db they live outside app/; EXTRACT_DIR overrides it.
 EXTRACT_DIR = os.environ.get("EXTRACT_DIR", os.path.join(DATA_DIR, "extracted"))
@@ -41,6 +44,13 @@ EMBED_MODEL = "nomic-embed-text"
 # messages (all calls go through common/models.py). The CHAT_MODEL
 # environment variable tries another without editing this.
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "qwen2.5:7b")
+# The model that labels each recipe's dish types when the index is built
+# (match_utils/dish_labels.py). A one-time job, not one she waits on, so
+# a bigger model is worth it: qwen2.5:14b got at least one right type for
+# 84% of a hand-checked set where 7b got 59% (2026-11-25), at about ten
+# times the time (1.9s a recipe on an RTX 2070 Super). Falls back to
+# CHAT_MODEL, with a warning, if it isn't pulled. LABEL_MODEL overrides it.
+LABEL_MODEL = os.environ.get("LABEL_MODEL", "qwen2.5:14b")
 # The context size (tokens) every call asks for. One size for all of
 # them: Ollama reloads the model whenever a call asks for a different
 # one, which cost ~10s a switch. 8192 fits six recipe excerpts plus the
