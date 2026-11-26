@@ -40,7 +40,10 @@ COOKIES = [c for c in CANDIDATES if "cookie" in c.payload["dishes"]]
 
 
 def respond(state, message):
+    # retrieve too: "show me the classic whipped cream" searches the
+    # database first, which needs Ollama (not there in CI).
     with mock.patch.object(router.models, "chat", return_value=({"message": {}}, 0.1)), \
+            mock.patch("actions.ask.retrieve", return_value=[]), \
             mock.patch("actions.ask.load_candidates", return_value=(CANDIDATES, "index")), \
             mock.patch("actions.ask.candidate_text", side_effect=lambda c: f"{c.title}\ntext"):
         return turn.respond(state, message, CANDIDATES)
