@@ -187,7 +187,7 @@ class AskPartialTest(unittest.TestCase):
                 mock.patch("actions.ask.find_recipes", return_value=(found, "index")), \
                 mock.patch("actions.ask.load_candidates", return_value=(list(index), "index")), \
                 mock.patch("actions.ask.candidate_text", side_effect=lambda c: f"text of {c.title}"), \
-                mock.patch("actions.ask._answer", return_value=("from the model", 0.1)) as model:
+                mock.patch("actions.ask._answer", return_value=("from the model", 0.1, [])) as model:
             return ask.run(question), model
 
     def test_one_plainly_closest_title_is_shown(self):

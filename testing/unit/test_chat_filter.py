@@ -171,6 +171,12 @@ class ModelFilterTest(unittest.TestCase):
         self.assertEqual(result.label, "model: ask filter all with pecans")
         self.assertTrue(result.every)
         self.assertEqual(len(result.choices), len(CANDIDATES))
+        # The rule too, with "anything" where a dish would be.
+        result, _ = route(fresh(), "anything made with pecans")
+        self.assertEqual(result.label, "rule: ask filter all with pecans")
+        # Naming a food isn't asking for recipes with it: answered.
+        result, _ = route(fresh(), "what goes well with pecans?", self.call(ingredient="pecans", without=False))
+        self.assertEqual(result.label, "model: ask filter_recipes, not an ingredient or dish, so answered")
 
     def test_these_or_without_and_no_list_asks_for_a_dish(self):
         for args in ({"dish": "these", "without": False}, {"without": True}):

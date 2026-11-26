@@ -91,6 +91,10 @@ class RunAndSaveTest(unittest.TestCase):
         self.assertEqual(lines[:3], ["1/2 passed (50%)", "1 routed by the model, 1 by rules or a pending question",
                                      "model time: 1.5s in all"])
         self.assertIn("  FAIL b  [model: ask]", lines)
+        checked = results + [dict(results[1], checks=[[]]), dict(results[1], checks=[[{"kind": "page"}], []]),
+                             dict(results[1], checks=[[{"kind": "page"}], [{"kind": "page"}]])]
+        self.assertIn("3 model answers checked: 1 passed at once, 2 asked again, 1 still shown with a warning",
+                      run_evals.summarize(checked))
         with tempfile.TemporaryDirectory() as directory:
             path = run_evals.save(results, "1.2.0", "qwen2.5:7b", directory)
             self.assertTrue(os.path.basename(path).startswith("1.2.0_qwen2.5-7b_"))

@@ -13,6 +13,7 @@ cream recipe from dessert person"), before a "Did you mean" list.
 import re
 from dataclasses import dataclass, field
 
+from actions import answer_checks
 from common import cli, models
 from query_utils.recipe_matching import extract_title, semantic_top_recipe_guess
 from query_utils.retrieval import candidate_text, retrieve, within_distance
@@ -113,6 +114,9 @@ class AskResult:
     via: dict = field(default_factory=dict)   # recipe key -> the variation it was found through
     notes: dict = field(default_factory=dict)  # recipe key -> a note shown after it ("optional")
     footer: str = ""                # for "choices": said after the list ("The other 3 don't.")
+    # for "answer": what actions/answer_checks.py still found wrong after
+    # asking the model again ({"kind", "what"} each), shown as a warning
+    unchecked: list = field(default_factory=list)
 
 
 def build_context(hits):
@@ -200,9 +204,9 @@ def run(question):
     context = build_context(llm_hits)
     user_prompt = f"Cookbook excerpts:\n\n{context}\n\nQuestion: {question}"
 
-    answer, seconds = _answer(user_prompt)
+    answer, seconds, unchecked = _answer(user_prompt, llm_hits, question)
     return AskResult("answer", question, answer=answer, sources=llm_hits,
-                     generation_time=seconds, warnings=warnings)
+                     generation_time=seconds, warnings=warnings, unchecked=unchecked)
 
 
 def _every_one_of_the_dish(question, closest):
@@ -262,16 +266,25 @@ def list_recipes(what, question):
     return AskResult("choices", question, choices=found, heading=f"You have {len(found)} {what.strip()} recipe{plural}:")
 
 
-def _answer(user_prompt):
-    response, seconds = models.chat(
-        "answer",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        options={"temperature": 0.2},
-    )
-    return response["message"]["content"], seconds
+def _answer(user_prompt, sources, question):
+    """The model's answer from the excerpts, checked
+    (actions/answer_checks.py). One that fails is sent back once with
+    what was wrong; returns (answer, seconds, problems left), the
+    problems saved with each model call too (models.CALLS "checks")."""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_prompt}]
+    response, seconds = models.chat("answer", messages=messages, options={"temperature": 0.2})
+    answer = response["message"]["content"]
+    problems = answer_checks.check(answer, sources, question)
+    models.note_checks(problems)
+    if not problems:
+        return answer, seconds, []
+    messages += [{"role": "assistant", "content": answer},
+                 {"role": "user", "content": answer_checks.for_the_model(problems)}]
+    response, more = models.chat("answer again", messages=messages, options={"temperature": 0.2})
+    again = response["message"]["content"]
+    left = answer_checks.check(again, sources, question)
+    models.note_checks(left)
+    return again, seconds + more, left
 
 
 def _stale(candidate):
@@ -311,10 +324,11 @@ def about_several(candidates, question):
     if not sources:
         return AskResult("nothing", question, warnings=warnings)
     about_what = " / ".join(c.title for c in candidates[:ABOUT_MAX_RECIPES])
-    answer, seconds = _answer(f"Cookbook excerpts:\n\n{build_context(sources)}\n\n"
-                              f"Question (about {about_what}): {question}")
+    answer, seconds, unchecked = _answer(f"Cookbook excerpts:\n\n{build_context(sources)}\n\n"
+                                         f"Question (about {about_what}): {question}", sources, question)
     return AskResult("answer", question, recipe=candidates[0] if len(candidates) == 1 else None,
-                     answer=answer, sources=sources, generation_time=seconds, warnings=warnings)
+                     answer=answer, sources=sources, generation_time=seconds, warnings=warnings,
+                     unchecked=unchecked)
 
 
 def variation_note(result):
@@ -366,6 +380,7 @@ def render(result):
         lines.append(result.heading)
     elif result.kind == "answer":
         lines += [result.answer,
+                  *([answer_checks.for_her(result.unchecked)] if result.unchecked else []),
                   f"\n(generation took {result.generation_time:.2f}s)",
                   "--- Retrieved from ---"]
         for h in result.sources:

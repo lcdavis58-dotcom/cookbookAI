@@ -74,6 +74,9 @@ FROM_BOOK_RE = re.compile(r"\b(?:one|version|recipe|it|that|this|theirs|hers|his
 # one from dessert person instead").
 NOT_A_DISH = frozenset("""no not ok okay actually what about how version versions kind instead rather there
     their theirs hers his her him book cookbook""".split())
+# Words standing where a dish would be that mean any recipe ("anything
+# made with rhubarb"; 1.2.0 said "None of your anything recipes").
+ANY_DISH = frozenset("anything something everything any some all recipe recipes dish dishes stuff things".split())
 # Back to what the recipe calls for.
 ORIGINAL_RE = re.compile(r"\b(original|as written|recipe'?s (?:own )?amounts|back to normal|normal amounts?|"
                          r"regular amounts?|unscaled|full recipe)\b", re.I)
@@ -171,6 +174,11 @@ _TRAILING_RE = re.compile(r"\s+(?:too|as\s+well|also|instead)\s*$", re.I)
 _ASKING_TAIL_RE = re.compile(r"\s*[,;.!]\s*(?:(?:so|and|now|ok(?:ay)?)\s+)?(?:(?:how|what|when|why|where|which|who)\b"
                              r"|(?:can|could|should|would|do|does|will)\s+(?:i|we|you)\b"
                              r"|(?:any\s+)?(?:ideas|suggestions)\b).*$", re.I)
+# A filter of every recipe needs her to ask for recipes by what's in them
+# ("show recipes that use buttermilk", "anything made with rhubarb"), not
+# just name a food ("what goes well with pumpkin pie?" is a question).
+_EVERY_CUE_RE = re.compile(r"\b(?:recipes?|dish(?:es)?|uses?|using|need(?:s)?|calls?\s+for|contains?|containing"
+                           r"|made\s+with|has|have|got)\b", re.I)
 
 
 @dataclass
@@ -650,6 +658,9 @@ class Router:
         if ingredient is None:
             return None
         sense = "without" if without else "with"
+        if dish and set(title_tokens(dish)) <= ANY_DISH:
+            # "anything made with rhubarb": no dish, so every recipe.
+            dish, every = "", True
         if dish:
             # "the one with pineapple" picks from a list; "one" isn't a dish.
             if not [w for w in title_tokens(dish) if not word_forms(w) & (NOT_INGREDIENT_WORDS | NOT_A_DISH)]:
@@ -664,6 +675,8 @@ class Router:
         if not recipes and every and not without:
             # "show recipes that use buttermilk": every recipe with it
             # (flag 1ncny; 1.2.0 asked for a dish).
+            if not _EVERY_CUE_RE.search(message):
+                return None
             return Route("ask", how, f"filter all with {ingredient}", mode="filter", choices=self.candidates,
                          ingredient=ingredient, request=message, every=True)
         if not recipes:

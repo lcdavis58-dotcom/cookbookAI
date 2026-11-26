@@ -49,6 +49,15 @@ def chat(job, messages, tools=None, options=None, format=None, model=None):
     return response, seconds
 
 
+def note_checks(problems):
+    """Saves what actions/answer_checks.py found with the last call
+    ({"kind", "what"} each, [] when it passed), for tools/metrics.py.
+    The calls are plain dicts in a saved chat, so an older version
+    still opens it."""
+    if CALLS:
+        CALLS[-1]["checks"] = list(problems)
+
+
 def installed(name):
     """Whether Ollama has the model pulled: True, False, or None when
     Ollama can't be reached."""
