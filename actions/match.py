@@ -70,11 +70,18 @@ def left_after(result, results):
 
 def _combined(notes):
     """One line for an ingredient taken to mean several things: fourteen
-    kinds of "assuming your chocolate is ..." say the same thing."""
-    kinds = {}
+    kinds of "assuming your chocolate is ..." say the same thing. One
+    kind in two word orders ("cultured low-fat buttermilk", "low-fat
+    cultured buttermilk") is said once (flag 1ncny)."""
+    kinds, seen = {}, set()
     for note in notes:
         found = ASSUMED_RE.match(note)
-        kinds.setdefault(found.group(1) if found else note, []).append(note)
+        item = found.group(1) if found else note
+        words = (item, frozenset(re.findall(r"[\w'-]+", note[found.end():].lower()))) if found else (note, None)
+        if words in seen:
+            continue
+        seen.add(words)
+        kinds.setdefault(item, []).append(note)
     out = []
     for item, group in kinds.items():
         if len(group) > MOST_ASSUMPTIONS_LISTED:

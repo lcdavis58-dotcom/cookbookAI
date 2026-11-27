@@ -105,7 +105,9 @@ def score(case, turn):
 
 def run_case(case, respond):
     """One case in a fresh chat: {"id", "failed", "route", "seconds",
-    "model_seconds"}. respond(state, message) answers a message."""
+    "model_seconds", "checks"}. checks: what actions/answer_checks.py
+    found in each model answer, in order (a second list means it was
+    asked again). respond(state, message) answers a message."""
     from chat.state import ChatState
     from common import models
 
@@ -121,7 +123,8 @@ def run_case(case, respond):
     except Exception as error:  # noqa: BLE001 - a crash is a failed case, not a stopped run
         failed, label = [f"error: {type(error).__name__}: {error}"], ""
     return {"id": case["id"], "failed": failed, "route": label, "seconds": round(time.time() - t0, 2),
-            "model_seconds": round(sum(c["seconds"] for c in models.CALLS), 2)}
+            "model_seconds": round(sum(c["seconds"] for c in models.CALLS), 2),
+            "checks": [c["checks"] for c in models.CALLS if "checks" in c]}
 
 
 def summarize(results):
@@ -130,6 +133,12 @@ def summarize(results):
     lines = [f"{passed}/{len(results)} passed ({100 * passed / max(1, len(results)):.0f}%)",
              f"{len(by_model)} routed by the model, {len(results) - len(by_model)} by rules or a pending question",
              f"model time: {sum(r['model_seconds'] for r in results):.1f}s in all"]
+    checked = [r.get("checks") for r in results if r.get("checks")]
+    if checked:
+        again = sum(1 for c in checked if len(c) > 1)
+        wrong = sum(1 for c in checked if c[-1])
+        lines.append(f"{len(checked)} model answers checked: {len(checked) - again} passed at once, "
+                     f"{again} asked again, {wrong} still shown with a warning")
     for r in results:
         if r["failed"]:
             lines.append(f"  FAIL {r['id']}  [{r['route']}]")

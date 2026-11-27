@@ -18,6 +18,7 @@ covers it (a version or a test). summaries() writes the two lists that
 tool saves: open_flags.md and handled_flags.md.
 """
 
+import functools
 import json
 import os
 import secrets
@@ -83,8 +84,10 @@ def _new_id():
     return "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(ID_LENGTH))
 
 
+@functools.lru_cache(maxsize=1)
 def app_version():
-    """The README's Version line, or None if it can't be read."""
+    """The README's Version line, or None if it can't be read. Read once:
+    it changes only with a restart."""
     from tools.check_version import find_versions
     try:
         return find_versions().get("README.md")

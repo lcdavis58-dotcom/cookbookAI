@@ -128,6 +128,11 @@ class ChatState:
     updated: str = ""
     messages: list = field(default_factory=list)
     focus: Focus = field(default_factory=Focus)
+    # The app version from each message on, {"9": "1.2.1"}: the number
+    # (1 = the first message) of the first reply each version gave, for
+    # tools/metrics.py (1.2.1). A key of the chat, not of each message, so
+    # an older version still opens the chat; it drops this if it saves it.
+    versions: dict = field(default_factory=dict)
 
     @classmethod
     def new(cls):
@@ -140,9 +145,17 @@ class ChatState:
             self.title = short_title(text)
         self.updated = self.messages[-1].at
 
-    def add_reply(self, text, action=None, route=None, model_calls=()):
+    def add_reply(self, text, action=None, route=None, model_calls=(), version=None):
         self.messages.append(Turn("assistant", text, now(), action, route, list(model_calls)))
         self.updated = self.messages[-1].at
+        if version and self.version_of(len(self.messages)) != version:
+            self.versions[str(len(self.messages))] = version
+
+    def version_of(self, number):
+        """The app version that gave message number (1 = the first), or
+        None for messages from before versions were kept."""
+        known = [int(n) for n in self.versions if int(n) <= number]
+        return self.versions[str(max(known))] if known else None
 
     def unanswered(self):
         """The last message, if it's hers and never got a reply (the
@@ -168,7 +181,7 @@ class ChatState:
             pending=Pending(**f["pending"]) if f.get("pending") else None,
         )
         return cls(data["id"], data.get("title", ""), data.get("created", ""), data.get("updated", ""),
-                   [Turn(**t) for t in data.get("messages", [])], focus)
+                   [Turn(**t) for t in data.get("messages", [])], focus, dict(data.get("versions") or {}))
 
 
 def _ref(data):

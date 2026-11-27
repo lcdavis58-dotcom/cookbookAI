@@ -22,7 +22,7 @@ from chat.router import route
 from chat.state import ChatState
 from query_utils.title_lookup import candidates_from_index
 from scale_utils.recipe_scaling import determine_scale_intent, resolve_scale_factor
-from testing.local.needs import MODEL_REPEAT, needs_database, needs_model, needs_search
+from testing.local.needs import MODEL_REPEAT, needs_database, needs_index, needs_model, needs_search
 
 CAKE = [metric_slash(line) for line in (
     "300 g / 2 cups all-purpose flour",
@@ -102,6 +102,14 @@ class RoutingTest(unittest.TestCase):
         # "how long does whipped cream keep in the fridge" is a rule since
         # 1.1.3 (a question about recipes it names).
         self.check("what goes well with pumpkin pie?", "ask")
+
+    @needs_index
+    def test_recipes_that_use_an_ingredient(self):
+        # Flag 1ncny: 1.2.0 asked for a dish; now every recipe with it.
+        # "a lot of" isn't read (results aren't ordered by amount).
+        for _ in range(MODEL_REPEAT):
+            r = route(ChatState.new(), "show recipes that use a lot of buttermilk")
+            self.assertEqual(r.label, "model: ask filter all with buttermilk")
 
     @unittest.skip("known gap, planned for 1.4.0: the model asks her what she means instead of answering")
     def test_general_question_known_gap(self):

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from actions import ask, match, scale
 from actions import filter as recipe_filter
 from actions.ask import MAX_LISTED
-from chat import narrow, reply, store
+from chat import flags, narrow, reply, store
 from chat.router import Router
 from chat.state import Numbered, Pending, _as_ref, remember
 from query_utils.title_lookup import ASKING_WORDS, title_tokens, word_forms
@@ -44,7 +44,7 @@ def run_route(router, route):
         if route.mode == "filter":
             return recipe_filter.run(route.choices, route.ingredient, route.without, route.what,
                                      index=[c.payload for c in router.candidates if c.payload],
-                                     question=route.request)
+                                     question=route.request, every=route.every)
         return ask.run(route.find_text)
     if route.action == "scale":
         if route.mode == "find":
@@ -127,6 +127,7 @@ def retry(state, directory=CHATS_DIR, candidates=None):
 def _answer(state, message, directory, candidates):
     models.clear()
     turn = respond(state, message, candidates)
-    state.add_reply(turn.text, turn.action, turn.route.label if turn.route else None, models.CALLS)
+    state.add_reply(turn.text, turn.action, turn.route.label if turn.route else None, models.CALLS,
+                    version=flags.app_version())
     store.save(state, directory)
     return turn

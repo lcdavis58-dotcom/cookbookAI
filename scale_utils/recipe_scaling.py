@@ -581,7 +581,7 @@ def _whole(ing, scaled_imperial, factor, flags):
     off = abs(whole - scaled_imperial)
     if (what == "whole" and off > 0.1 * scaled_imperial) or (what == "exact" and off > 0.005):
         exact = f"{scaled_imperial:.2f}".rstrip("0").rstrip(".")
-        flags.append(("rounded", f"Rounded up to {whole}; the exact amount is {exact}, so use part of the last one "
-                                 f"if it matters." if whole > scaled_imperial else
-                                 f"Rounded down to {whole}; the exact amount is {exact}."))
+        said = (f"Rounded up to {whole}; the exact amount is {exact}, so use part of the last one if it matters."
+                if whole > scaled_imperial else f"Rounded down to {whole}; the exact amount is {exact}.")
+        flags.append(("rounded", f"{said} {note}" if note else said))
     return whole, abs(whole - scaled_imperial) > 1e-9

@@ -67,7 +67,8 @@ _COUNT_EXCEPT = ("cup", "tablespoon", "teaspoon", "tbsp", "tsp", "oz", "ounce", 
 def whole_item(ing):
     """For a counted ingredient that only comes whole
     (ingredient_rules/whole_items.json): ("not_scaled", note) for a crust,
-    ("whole", None) for a can, ("exact", None) for an egg (always noted),
+    ("whole", None) for a can, ("exact", tip) for an egg (always noted
+    when rounded, with how to measure part of one),
     ("rough", None) for a pinch; None for anything else, including
     anything measured by volume. A line with a weight too ("100 g / 2
     large eggs") rounds only its count; a crust with a weight is scaled."""
@@ -87,7 +88,7 @@ def whole_item(ing):
     if any(_keyword_matches(k, text) for k in rules.get("whole_units", [])):
         return "whole", None
     if any(_keyword_matches(k, text) for k in rules.get("always_noted_units", [])):
-        return "exact", None
+        return "exact", rules.get("always_noted_tip")
     if any(_keyword_matches(k, text) for k in rules.get("rough_units", [])):
         return "rough", None
     return None

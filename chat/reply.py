@@ -6,7 +6,7 @@ number or the book", and match results are numbered so "the third one"
 can be asked for.
 """
 
-from actions import ask, match, scale
+from actions import answer_checks, ask, match, scale
 
 PICK_HINT = "Type a number, or part of the recipe's name or book."
 
@@ -44,6 +44,8 @@ def ask_reply(result):
             if source not in sources:
                 sources.append(source)
         lines += [result.answer, f"\n(From {'; '.join(sources)})"]
+        if result.unchecked:
+            lines.append(answer_checks.for_her(result.unchecked))
     elif result.kind == "said":
         lines.append(result.heading)
     else:

@@ -153,6 +153,13 @@ class WholeItemsTest(unittest.TestCase):
                 else:
                     self.assertEqual(rounded, [])
 
+    def test_the_egg_tip_only_when_rounded(self):
+        # Flag wg7cv: 2 eggs doubled said it had rounded.
+        self.assertEqual(self.scaled(count_line("large eggs, room temperature", 2), 2)["flags"], [])
+        rounded = self.scaled(count_line("large eggs", 3), 1.125)["flags"]
+        self.assertEqual([kind for kind, _ in rounded], ["rounded"])
+        self.assertIn("whisk one egg", rounded[0][1])
+
     def test_a_weighed_egg_rounds_its_count_and_keeps_its_grams(self):
         eggs = self.scaled(metric_slash("100 g / 2 large eggs"), 1.25)
         self.assertEqual((eggs["scaled_metric"], eggs["scaled_imperial"]), (125, 3))

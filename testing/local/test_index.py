@@ -136,6 +136,15 @@ class DishAndFilterTest(unittest.TestCase):
             with self.subTest(title=title):
                 self.assertIn(dish, by_title[title]["dishes"])
 
+    def test_cake_parts_arent_cakes(self):
+        # Flag pfguy: set in dish_label_overrides.json. Their titles still
+        # list them under "cake" (see BOOK_FORMATS.md Follow-ups).
+        by_title = {(e["book"], e["title"]): e for e in self.index}
+        for title, dish in (("Birthday Cake Crumb", "crust"), ("Birthday Cake Soak", "dessert sauce"),
+                            ("Carrot Cake Truffles", "candy")):
+            with self.subTest(title=title):
+                self.assertEqual(by_title[("Momofuku Milk Bar", title)]["dishes"], [dish])
+
     def test_pumpkin_pies_and_half_and_half(self):
         state = ChatState.new()
         turn.respond(state, "what pumpkin pie recipes do i have")
